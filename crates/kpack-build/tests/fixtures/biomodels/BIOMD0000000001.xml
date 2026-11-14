@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level2/version4" level="2" version="4">
+  <model id="m">
+    <listOfCompartments><compartment id="cell" size="1"/></listOfCompartments>
+    <listOfSpecies>
+      <species metaid="a1" id="G6P" name="glucose-6-phosphate" compartment="cell" initialConcentration="1">
+        <annotation><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/"><rdf:Description rdf:about="#a1"><bqbiol:is><rdf:Bag><rdf:li rdf:resource="urn:miriam:obo.chebi:CHEBI%3A4170"/></rdf:Bag></bqbiol:is></rdf:Description></rdf:RDF></annotation>
+      </species>
+      <species metaid="a2" id="Glc" name="glucose" compartment="cell" initialConcentration="1">
+        <annotation><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/"><rdf:Description rdf:about="#a2"><bqbiol:is><rdf:Bag><rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:17634"/></rdf:Bag></bqbiol:is></rdf:Description></rdf:RDF></annotation>
+      </species>
+      <species metaid="a3" id="s1" compartment="cell" initialConcentration="1">
+        <annotation><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/"><rdf:Description rdf:about="#a3"><bqbiol:is><rdf:Bag><rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:15422"/></rdf:Bag></bqbiol:is></rdf:Description></rdf:RDF></annotation>
+      </species>    </listOfSpecies>
+    <listOfReactions>
+      <reaction metaid="r1" id="HK" name="hexokinase">
+        <annotation><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/"><rdf:Description rdf:about="#r1"><bqbiol:is><rdf:Bag><rdf:li rdf:resource="http://identifiers.org/rhea/17825"/></rdf:Bag></bqbiol:is></rdf:Description></rdf:RDF></annotation>
+        <listOfReactants><speciesReference species="Glc"/></listOfReactants>
+        <listOfProducts><speciesReference species="G6P"/></listOfProducts>
+      </reaction>
+    </listOfReactions>
+  </model>
+</sbml>

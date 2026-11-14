@@ -1,0 +1,15 @@
+[package]
+name = "kpack-build"
+description = "Builds the annotator's knowledge pack from BiGG and other sources. Native only."
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+clap = { version = "4.6.7", features = ["derive"] }
+flate2 = "1.1.11"
+kpack = { path = "../kpack" }
+sbml-io = { path = "../sbml-io" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+ureq = "3.5.2"

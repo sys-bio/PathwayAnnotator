@@ -1,0 +1,8 @@
+date	pack_built	set	models	providers	species_graded	species_top1	species_top3	species_coverage	species_precision	reactions_graded	reactions_top1	reactions_top3	reactions_coverage	reactions_precision	novel_models	novel_species_top1	novel_reactions_top1
+2026-11-14	2026-11-14	test	215	names	1267	86.7%	87.9%	89.7%	96.7%	641	33.1%	33.4%	34.5%	95.9%
+2026-11-14	2026-11-14	test	215	names	1267	86.7%	87.9%	89.7%	96.7%	641	33.1%	33.4%	34.5%	95.9%	133	85.1%	6.9%
+2026-11-14	2026-11-14	test	215	names+decoder	1267	90.5%	91.8%	93.7%	96.6%	641	34.0%	34.3%	35.7%	95.2%	133	87.7%	8.4%
+2026-11-14	2026-11-14	test	215	names+decoder	1267	91.0%	92.3%	94.1%	96.7%	641	49.3%	49.6%	51.0%	96.6%	133	88.7%	32.7%
+2026-11-14	2026-11-14	test	215	names+decoder+context	1267	91.9%	93.4%	96.5%	95.2%	641	81.3%	84.1%	91.7%	88.6%	133	90.8%	81.4%
+2026-11-14	2026-11-14	test	215	names+decoder+context	1267	91.9%	93.4%	96.4%	95.4%	641	81.7%	84.2%	89.9%	91.0%	133	90.8%	82.2%
+2026-11-14	2026-11-14	test	215	names+decoder+context	1267	91.9%	93.4%	96.4%	95.4%	641	81.7%	84.2%	89.9%	91.0%	133	90.8%	82.2%

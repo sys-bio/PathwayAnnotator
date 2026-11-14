@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level2/version4" level="2" version="4">
+  <model id="m">
+    <listOfCompartments><compartment id="cell" size="1"/></listOfCompartments>
+    <listOfSpecies>
+      <species metaid="b1" id="G6P" compartment="cell" initialConcentration="1">
+        <annotation><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/"><rdf:Description rdf:about="#b1"><bqbiol:is><rdf:Bag><rdf:li rdf:resource="https://identifiers.org/CHEBI:4170"/></rdf:Bag></bqbiol:is></rdf:Description></rdf:RDF></annotation>
+      </species>
+      <species metaid="b2" id="s1" compartment="cell" initialConcentration="1">
+        <annotation><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/"><rdf:Description rdf:about="#b2"><bqbiol:is><rdf:Bag><rdf:li rdf:resource="http://identifiers.org/kegg.compound/C00085"/></rdf:Bag></bqbiol:is></rdf:Description></rdf:RDF></annotation>
+      </species>    </listOfSpecies>
+  </model>
+</sbml>

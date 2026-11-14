@@ -1,0 +1,12 @@
+[package]
+name = "annot-engine"
+description = "The annotator's inference engine: suggests database annotations for a model's species and reactions, with evidence. No I/O; works in WebAssembly."
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kpack = { path = "../kpack" }
+
+[dev-dependencies]
+kpack-build = { path = "../kpack-build" }

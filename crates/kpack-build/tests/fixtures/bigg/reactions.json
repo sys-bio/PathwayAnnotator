@@ -1,0 +1,816 @@
+[
+ {
+  "bigg_id": "ACOAD8f:2",
+  "copy_number": 2,
+  "participants": [
+   [
+    -1.0,
+    "fad_c:0"
+   ],
+   [
+    -1.0,
+    "stcoa_c:-4"
+   ],
+   [
+    1.0,
+    "fadh2_c:0"
+   ],
+   [
+    1.0,
+    "od2coa_c:-4"
+   ]
+  ],
+  "universalreaction__bigg_id": "ACOAD8f",
+  "universalreaction__name": "Acyl-CoA dehydrogenase (octadecanoyl-CoA)",
+  "universalreaction__participants": [
+   [
+    -1.0,
+    "fad_c"
+   ],
+   [
+    -1.0,
+    "h_c"
+   ],
+   [
+    -1.0,
+    "stcoa_c"
+   ],
+   [
+    1.0,
+    "fadh2_c"
+   ],
+   [
+    1.0,
+    "od2coa_c"
+   ]
+  ],
+  "universalreaction__is_exchange": false,
+  "universalreaction__is_pseudo": false,
+  "universalreaction__is_transport": false,
+  "universalreaction__old_bigg_ids": [],
+  "referencereaction__bigg_id": "RHEA:40843",
+  "cross_references": [
+   {
+    "namespace": "rhea",
+    "identifier": "40843",
+    "source": "RHEA:40843",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "40844",
+    "source": "RHEA:40843",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "40845",
+    "source": "RHEA:40843",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "40846",
+    "source": "RHEA:40843",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   }
+  ]
+ },
+ {
+  "bigg_id": "ACOAD8f",
+  "copy_number": 1,
+  "participants": [
+   [
+    -1.0,
+    "fad_c:-3"
+   ],
+   [
+    -1.0,
+    "h_c:1"
+   ],
+   [
+    -1.0,
+    "stcoa_c:-4"
+   ],
+   [
+    1.0,
+    "fadh2_c:-2"
+   ],
+   [
+    1.0,
+    "od2coa_c:-4"
+   ]
+  ],
+  "universalreaction__bigg_id": "ACOAD8f",
+  "universalreaction__name": "Acyl-CoA dehydrogenase (octadecanoyl-CoA)",
+  "universalreaction__participants": [
+   [
+    -1.0,
+    "fad_c"
+   ],
+   [
+    -1.0,
+    "h_c"
+   ],
+   [
+    -1.0,
+    "stcoa_c"
+   ],
+   [
+    1.0,
+    "fadh2_c"
+   ],
+   [
+    1.0,
+    "od2coa_c"
+   ]
+  ],
+  "universalreaction__is_exchange": false,
+  "universalreaction__is_pseudo": false,
+  "universalreaction__is_transport": false,
+  "universalreaction__old_bigg_ids": [],
+  "referencereaction__bigg_id": "RHEA:40843",
+  "cross_references": [
+   {
+    "namespace": "rhea",
+    "identifier": "40843",
+    "source": "RHEA:40843",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "40844",
+    "source": "RHEA:40843",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "40845",
+    "source": "RHEA:40843",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "40846",
+    "source": "RHEA:40843",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "seed.reaction",
+    "identifier": "rxn08053",
+    "source": "seed.reaction:rxn08053",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR95317",
+    "source": "seed.reaction:rxn08053",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id"
+    ]
+   }
+  ]
+ },
+ {
+  "bigg_id": "HEX1",
+  "copy_number": 1,
+  "participants": [
+   [
+    -1.0,
+    "glc__D_c:0"
+   ],
+   [
+    -1.0,
+    "atp_c:-4"
+   ],
+   [
+    1.0,
+    "adp_c:-3"
+   ],
+   [
+    1.0,
+    "h_c:1"
+   ],
+   [
+    1.0,
+    "g6p_c:-2"
+   ]
+  ],
+  "universalreaction__bigg_id": "HEX1",
+  "universalreaction__name": "hexokinase (D-glucose:ATP)",
+  "universalreaction__participants": [
+   [
+    -1.0,
+    "glc__D_c"
+   ],
+   [
+    -1.0,
+    "atp_c"
+   ],
+   [
+    1.0,
+    "adp_c"
+   ],
+   [
+    1.0,
+    "h_c"
+   ],
+   [
+    1.0,
+    "g6p_c"
+   ]
+  ],
+  "universalreaction__is_exchange": false,
+  "universalreaction__is_pseudo": false,
+  "universalreaction__is_transport": false,
+  "universalreaction__old_bigg_ids": [
+   "HEX1_1"
+  ],
+  "referencereaction__bigg_id": "RHEA:17825",
+  "cross_references": [
+   {
+    "namespace": "rhea",
+    "identifier": "17825",
+    "source": "RHEA:17825",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "17826",
+    "source": "RHEA:17825",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "17827",
+    "source": "RHEA:17825",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "17828",
+    "source": "RHEA:17825",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "GO",
+    "identifier": "0004340",
+    "source": "RHEA:17825",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "ec-code",
+    "identifier": "2.7.1.1",
+    "source": "RHEA:17825",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "ec-code",
+    "identifier": "2.7.1.2",
+    "source": "RHEA:17825",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "metacyc.reaction",
+    "identifier": "GLUCOKIN-RXN",
+    "source": "RHEA:17825",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "kegg.reaction",
+    "identifier": "R00299",
+    "source": "RHEA:17825",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "seed.reaction",
+    "identifier": "rxn00216",
+    "source": "seed.reaction:rxn00216",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "kegg.reaction",
+    "identifier": "R00299",
+    "source": "seed.reaction:rxn00216",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "metacyc.reaction",
+    "identifier": "GLUCOKIN-RXN",
+    "source": "seed.reaction:rxn00216",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR140070",
+    "source": "seed.reaction:rxn00216",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR100612",
+    "source": "seed.reaction:rxn00216",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "seed.reaction",
+    "identifier": "rxn34232",
+    "source": "seed.reaction:rxn34232",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "kegg.reaction",
+    "identifier": "R00299",
+    "source": "seed.reaction:rxn34232",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "metacyc.reaction",
+    "identifier": "GLUCOKIN-RXN",
+    "source": "seed.reaction:rxn34232",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR140070",
+    "source": "seed.reaction:rxn34232",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR100612",
+    "source": "seed.reaction:rxn34232",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id"
+    ]
+   }
+  ]
+ },
+ {
+  "bigg_id": "PFK",
+  "copy_number": 1,
+  "participants": [
+   [
+    -1.0,
+    "f6p_c:-2"
+   ],
+   [
+    -1.0,
+    "atp_c:-4"
+   ],
+   [
+    1.0,
+    "fdp_c:-4"
+   ],
+   [
+    1.0,
+    "adp_c:-3"
+   ],
+   [
+    1.0,
+    "h_c:1"
+   ]
+  ],
+  "universalreaction__bigg_id": "PFK",
+  "universalreaction__name": "phosphofructokinase",
+  "universalreaction__participants": [
+   [
+    -1.0,
+    "f6p_c"
+   ],
+   [
+    -1.0,
+    "atp_c"
+   ],
+   [
+    1.0,
+    "fdp_c"
+   ],
+   [
+    1.0,
+    "adp_c"
+   ],
+   [
+    1.0,
+    "h_c"
+   ]
+  ],
+  "universalreaction__is_exchange": false,
+  "universalreaction__is_pseudo": false,
+  "universalreaction__is_transport": false,
+  "universalreaction__old_bigg_ids": [],
+  "referencereaction__bigg_id": "RHEA:16109",
+  "cross_references": [
+   {
+    "namespace": "rhea",
+    "identifier": "16109",
+    "source": "RHEA:16109",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "16110",
+    "source": "RHEA:16109",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "16111",
+    "source": "RHEA:16109",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "rhea",
+    "identifier": "16112",
+    "source": "RHEA:16109",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "GO",
+    "identifier": "0003872",
+    "source": "RHEA:16109",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "ec-code",
+    "identifier": "2.7.1.11",
+    "source": "RHEA:16109",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "metacyc.reaction",
+    "identifier": "6PFRUCTPHOS-RXN",
+    "source": "RHEA:16109",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "kegg.reaction",
+    "identifier": "R00756",
+    "source": "RHEA:16109",
+    "source_type": "rhea_reference",
+    "source_obsolete": false,
+    "match": [
+     "reference"
+    ]
+   },
+   {
+    "namespace": "seed.reaction",
+    "identifier": "rxn00545",
+    "source": "seed.reaction:rxn00545",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "kegg.reaction",
+    "identifier": "R00756",
+    "source": "seed.reaction:rxn00545",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR138694",
+    "source": "seed.reaction:rxn00545",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "seed.reaction",
+    "identifier": "rxn34257",
+    "source": "seed.reaction:rxn34257",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "kegg.reaction",
+    "identifier": "R00756",
+    "source": "seed.reaction:rxn34257",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR138694",
+    "source": "seed.reaction:rxn34257",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id"
+    ]
+   }
+  ]
+ },
+ {
+  "bigg_id": "PGI",
+  "copy_number": 1,
+  "participants": [
+   [
+    -1.0,
+    "g6p_c:-2"
+   ],
+   [
+    1.0,
+    "f6p_c:-2"
+   ]
+  ],
+  "universalreaction__bigg_id": "PGI",
+  "universalreaction__name": "glucose-6-phosphate isomerase",
+  "universalreaction__participants": [
+   [
+    -1.0,
+    "g6p_c"
+   ],
+   [
+    1.0,
+    "f6p_c"
+   ]
+  ],
+  "universalreaction__is_exchange": false,
+  "universalreaction__is_pseudo": false,
+  "universalreaction__is_transport": false,
+  "universalreaction__old_bigg_ids": [],
+  "cross_references": [
+   {
+    "namespace": "seed.reaction",
+    "identifier": "rxn00558",
+    "source": "seed.reaction:rxn00558",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id",
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "kegg.reaction",
+    "identifier": "R00771",
+    "source": "seed.reaction:rxn00558",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id",
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR138699",
+    "source": "seed.reaction:rxn00558",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "bigg_id",
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "seed.reaction",
+    "identifier": "rxn33838",
+    "source": "seed.reaction:rxn33838",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "metacyc.reaction",
+    "identifier": "PGLUCISOM-RXN",
+    "source": "seed.reaction:rxn33838",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR102535",
+    "source": "seed.reaction:rxn33838",
+    "source_type": "modelseed",
+    "source_obsolete": false,
+    "match": [
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "seed.reaction",
+    "identifier": "rxn34259",
+    "source": "seed.reaction:rxn34259",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id",
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "kegg.reaction",
+    "identifier": "R00771",
+    "source": "seed.reaction:rxn34259",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id",
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR138699",
+    "source": "seed.reaction:rxn34259",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "bigg_id",
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "seed.reaction",
+    "identifier": "rxn37760",
+    "source": "seed.reaction:rxn37760",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "metacyc.reaction",
+    "identifier": "PGLUCISOM-RXN",
+    "source": "seed.reaction:rxn37760",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "stoichiometry"
+    ]
+   },
+   {
+    "namespace": "metanetx.reaction",
+    "identifier": "MNXR102535",
+    "source": "seed.reaction:rxn37760",
+    "source_type": "modelseed",
+    "source_obsolete": true,
+    "match": [
+     "stoichiometry"
+    ]
+   }
+  ]
+ }
+]

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level2/version4" level="2" version="4">
+  <model id="m">
+    <listOfCompartments><compartment id="cell" size="1"/></listOfCompartments>
+    <listOfSpecies>
+      <species metaid="c1" id="G6P" compartment="cell" initialConcentration="1">
+        <annotation><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/"><rdf:Description rdf:about="#c1"><bqbiol:is><rdf:Bag><rdf:li rdf:resource="http://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:61548"/></rdf:Bag></bqbiol:is></rdf:Description></rdf:RDF></annotation>
+      </species>
+      <species metaid="c2" id="s1" compartment="cell" initialConcentration="1">
+        <annotation><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/"><rdf:Description rdf:about="#c2"><bqbiol:is><rdf:Bag><rdf:li rdf:resource="urn:miriam:kegg.compound:C00008"/></rdf:Bag></bqbiol:is></rdf:Description></rdf:RDF></annotation>
+      </species>
+      <species metaid="c3" id="mix" compartment="cell" initialConcentration="1">
+        <annotation><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/"><rdf:Description rdf:about="#c3"><bqbiol:is><rdf:Bag><rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:15422"/><rdf:li rdf:resource="http://identifiers.org/chebi/CHEBI:16761"/></rdf:Bag></bqbiol:is></rdf:Description></rdf:RDF></annotation>
+      </species>
+      <species metaid="c4" id="prot" compartment="cell" initialConcentration="1">
+        <annotation><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/"><rdf:Description rdf:about="#c4"><bqbiol:is><rdf:Bag><rdf:li rdf:resource="http://identifiers.org/uniprot/P12345"/></rdf:Bag></bqbiol:is></rdf:Description></rdf:RDF></annotation>
+      </species>    </listOfSpecies>
+  </model>
+</sbml>
