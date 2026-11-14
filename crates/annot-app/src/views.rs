@@ -605,6 +605,22 @@ fn Chip(reaction: Element, position: usize, species: Element, label: String, cla
     let key = (reaction, position);
     let pinned = move || ctx.pinned.get() == Some(key);
     let card_id = format!("card-{}-{position}", dom_id(reaction));
+    // Where the card opens: below and to the right of the chip unless there
+    // is no room there ([`place_card`]).
+    let wrap_ref = NodeRef::<leptos::html::Span>::new();
+    let card_ref = NodeRef::<leptos::html::Span>::new();
+    let up = RwSignal::new(false);
+    let end = RwSignal::new(false);
+    let place = move || {
+        request_animation_frame(move || {
+            if let (Some(wrap), Some(card)) = (wrap_ref.get_untracked(), card_ref.get_untracked())
+                && let Some((u, e)) = place_card(&wrap, &card)
+            {
+                up.set(u);
+                end.set(e);
+            }
+        })
+    };
     let info = move || s.with(|s| s.as_ref().map(|s| s.molecule_info(species)));
     let accept = move |ev: web_sys::MouseEvent| {
         ev.stop_propagation();
@@ -680,7 +696,15 @@ fn Chip(reaction: Element, position: usize, species: Element, label: String, cla
             .into_any()
     };
     view! {
-        <span class="chip-wrap" class:pinned=pinned>
+        <span
+            class="chip-wrap"
+            class:pinned=pinned
+            class:up=move || up.get()
+            class:end=move || end.get()
+            node_ref=wrap_ref
+            on:mouseenter=move |_| place()
+            on:focusin=move |_| place()
+        >
             <button
                 class=format!("chip {class}")
                 aria-expanded=move || pinned().to_string()
@@ -688,15 +712,39 @@ fn Chip(reaction: Element, position: usize, species: Element, label: String, cla
                 on:click=move |ev: web_sys::MouseEvent| {
                     ev.stop_propagation();
                     ctx.pinned.update(|p| *p = if *p == Some(key) { None } else { Some(key) });
+                    place();
                 }
             >
                 {label}
             </button>
-            <span class="chip-card" id=card_id.clone() on:click=|ev: web_sys::MouseEvent| ev.stop_propagation()>
+            <span
+                class="chip-card"
+                id=card_id.clone()
+                node_ref=card_ref
+                on:click=|ev: web_sys::MouseEvent| ev.stop_propagation()
+            >
                 {card}
             </span>
         </span>
     }
+}
+
+/// Where a chip's card fits, once it is showing: `(up, end)`, opening
+/// upward when there is not room below the chip but more above, and lining
+/// up with the chip's right edge when it would run off the right of the
+/// window. `None` when the card is not showing (nothing to measure).
+fn place_card(wrap: &web_sys::HtmlElement, card: &web_sys::HtmlElement) -> Option<(bool, bool)> {
+    let c = card.get_bounding_client_rect();
+    if c.height() == 0.0 {
+        return None;
+    }
+    let w = wrap.get_bounding_client_rect();
+    let root = document().document_element()?;
+    let (view_w, view_h) = (f64::from(root.client_width()), f64::from(root.client_height()));
+    let (below, above) = (view_h - w.bottom(), w.top());
+    let up = c.height() > below && above > below;
+    let end = w.left() + c.width() > view_w && w.right() - c.width() >= 0.0;
+    Some((up, end))
 }
 
 /// An element's SBML id, and renaming it: every reference in the model

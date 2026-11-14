@@ -47,9 +47,7 @@ body {
   font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Room at the bottom so a molecule card opened on the last reaction is not
-   cut off by the end of the page. */
-main { max-width: 1000px; margin: 0 auto; padding: 16px 16px 260px; }
+main { max-width: 1000px; margin: 0 auto; padding: 16px 16px 48px; }
 
 button {
   font: inherit;
@@ -169,6 +167,10 @@ ul.items { list-style: none; margin: 0; padding: 0; }
 .chip-wrap:hover .chip-card,
 .chip-wrap:has(.chip:focus-visible) .chip-card,
 .chip-wrap.pinned .chip-card { display: block; }
+/* No room below or to the right: the card opens upward, or lines up with
+   the chip's right edge (set by place_card in views.rs). */
+.chip-wrap.up .chip-card { top: auto; bottom: 100%; padding-top: 0; padding-bottom: 6px; }
+.chip-wrap.end .chip-card { left: auto; right: 0; }
 .chip-wrap.pinned .chip { outline: 2px solid var(--accent); outline-offset: 1px; }
 .chip-card-body {
   width: max-content; max-width: min(340px, 85vw); padding: 10px 12px;

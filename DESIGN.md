@@ -656,9 +656,11 @@ Known issues / next (in order):
 - Some molecule labels are chemists' names for the charged form
   ("3-phosphonato-D-glycerate", "hydrogenphosphate"); the familiar name is
   shown as a synonym. Preferring a familiar label is a possible next step.
-- A molecule card opened near the bottom of the page needed extra space
-  below the list (now padded); a card that opens upward when there is no
-  room below would be better.
+- Done (2026-11-14): a molecule card opens upward when there is no room
+  below the chip and more above, and lines up with the chip's right edge
+  when it would run off the right of the window (`place_card` in
+  views.rs, measured in the frame the card appears, so it does not flash).
+  The extra space below the list is gone.
 - No search for an element the engine has nothing for (OLS / UniProt),
   no keyboard shortcuts, no SBO / qualifier editing in the UI yet.
 - Publishing to GitHub Pages needs a CI job that builds the pack (BiGG,
