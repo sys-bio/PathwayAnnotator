@@ -1,0 +1,25 @@
+// Upper glycolysis, written the way modelers often write it: some clear
+// names, some abbreviations, some meaningless ids. Nothing is annotated.
+// An example for PathwayAnnotator; not a published model.
+
+model glycolysis_example
+  compartment ext = 1, cell = 1;
+
+  species Glc_ext in ext = 5;
+  species GLC in cell = 0.1, ATP in cell = 2, ADP in cell = 0.5;
+  species G6P in cell = 0.2, X2 in cell = 0.1, FBP in cell = 0.05;
+  species DHAP in cell = 0.1, GAP in cell = 0.02;
+  species NAD in cell = 1, NADH in cell = 0.1, Pi in cell = 5;
+  species BPG in cell = 0.01, s9 in cell = 0.1;
+
+  vGLT:   Glc_ext -> GLC;                k1 * Glc_ext;
+  vHK:    GLC + ATP -> G6P + ADP;        k2 * GLC * ATP;
+  vPGI:   G6P -> X2;                     k3 * G6P;
+  vPFK:   X2 + ATP -> FBP + ADP;         k4 * X2 * ATP;
+  vALD:   FBP -> DHAP + GAP;             k5 * FBP;
+  vTPI:   DHAP -> GAP;                   k6 * DHAP;
+  vGAPDH: GAP + NAD + Pi -> BPG + NADH;  k7 * GAP * NAD;
+  vPGK:   BPG + ADP -> s9 + ATP;         k8 * BPG * ADP;
+
+  k1 = 1; k2 = 1; k3 = 1; k4 = 1; k5 = 1; k6 = 1; k7 = 1; k8 = 1;
+end

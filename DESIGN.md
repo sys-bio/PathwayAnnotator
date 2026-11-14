@@ -506,6 +506,64 @@ Status (2026-11-14): implemented; builds for WebAssembly.
 - Not yet: writing annotations back into Antimony text (an Antimony model
   is exported as SBML), and SBML -> Antimony.
 
+## 5.3 The browser app (`annot-app`)
+
+Status (2026-11-14): first working version, checked in Chrome on the
+built-in example.
+
+```
+cd crates/annot-app
+trunk serve --open            # needs packs/kpack.bin at the repository root
+```
+
+- Leptos 0.8 (client-side rendering), built with Trunk. Leptos 0.8.3's
+  macros break with `server_fn_macro` 0.8.12 (it moved to syn 3), so
+  `Cargo.lock` pins `server_fn_macro` and `server_fn_macro_default` to
+  0.8.3; keep the pin until Leptos is upgraded.
+- The pack is copied next to the app by Trunk and fetched on start
+  (~2 MB; the WebAssembly is ~1.7 MB).
+- Screens: start (drop or choose an SBML/Antimony file, or the built-in
+  glycolysis example, `assets/glycolysis-example.ant`); overview (progress
+  bars for molecules and reactions by status, "accept all high-confidence");
+  Molecules / Reactions tabs with filters (all, to review, identified, no
+  suggestion); each row shows the status, best suggestion and confidence
+  with Accept; expanding shows the current annotation and up to five
+  candidates with their evidence; reactions show their equation with
+  molecule chips coloured by status (a chip jumps to that molecule);
+  undo / redo; save annotated SBML (download); close.
+- State lives in `session.rs` (no UI code): statuses are cached and
+  recomputed after each edit.
+- Checking a suggestion: every suggested (and identified) name links to its
+  main database entry, and the details list each database id as a link
+  ("ChEBI 16084", "KEGG Compound C00085"), all opening in a new tab. The
+  links are the identifiers.org URIs that accepting writes, so what people
+  check is exactly what gets saved.
+- Every row has an explicit "Details / Hide" control (the whole row also
+  toggles, but nothing showed that).
+- Serving `dist/` with another web server while running `trunk build`
+  fails on Windows (the folder is in use); `trunk serve` avoids it.
+
+Found while testing in the browser, and fixed in the engine:
+- Compartment and organism variants of one BiGG reaction (PFK, PFKg)
+  appeared as separate candidates, and ties went to the obscure one.
+  Context now keeps one reaction per chemistry and prefers the plainest
+  BiGG id.
+- Matched cofactors did not count in a reaction's weight, so the
+  phosphatase tied with the kinase. They now count a little.
+Both raised novel-model reactions from 82.2% to 82.7% right first.
+
+Known issues / next:
+- "Accept all" is undone one element at a time; it should be one step.
+- Suggestions are computed once on load; accepted answers should become
+  anchors and the engine re-run.
+- Some BiGG labels are poor ("R_glucose_transport__uniport_", "PGKf");
+  prefer a ChEBI/Rhea name or a cleaned label for display.
+- No search for an element the engine has nothing for (OLS / UniProt),
+  no keyboard shortcuts, no SBO / qualifier editing in the UI yet.
+- Publishing to GitHub Pages needs a CI job that builds the pack (BiGG,
+  ChEBI and BioModels fetch, ~10 minutes) or a pack published as a release
+  asset.
+
 ## 6. Benchmark (`annot-cli bench`)
 
 Status (2026-11-14): implemented.

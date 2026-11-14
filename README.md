@@ -9,9 +9,10 @@ The suggestions come from curated data shipped with the app as a
 **knowledge pack**, not from an online AI service: no accounts, no API
 keys, and models never leave your machine.
 
-Status: the knowledge pack, the suggestion engine and an accuracy
-benchmark work; the web app is not built yet. See [DESIGN.md](DESIGN.md)
-for the design, data sources and results.
+Status: the knowledge pack, the suggestion engine, the accuracy
+benchmark and a first version of the web app work; the app is not
+published yet. See [DESIGN.md](DESIGN.md) for the design, data sources and
+results.
 
 ## How it suggests
 
@@ -37,6 +38,7 @@ the time.
 | `annot-engine` | The suggestion engine, its providers and confidence levels (WebAssembly) |
 | `annot-model` | Loads SBML/Antimony, applies accepted annotations with undo, writes SBML (WebAssembly) |
 | `annot-cli` | The benchmark, later batch annotation (native) |
+| `annot-app` | The browser app (Leptos, built with Trunk) |
 | `sbml-io`, `antimony` | SBML and Antimony reading and writing |
 
 ## Building the pack and running the benchmark
@@ -50,6 +52,14 @@ cargo run --release -p kpack-build -- lookup packs/kpack.bin G6P
 
 cargo run --release -p kpack-build -- build --exclude-test-models --out packs/kpack-train.bin
 cargo run --release -p annot-cli -- bench          # writes bench/latest.md
+```
+
+To run the app locally (needs [Trunk](https://trunkrs.dev) and the
+`wasm32-unknown-unknown` target, and `packs/kpack.bin` built as above):
+
+```
+cd crates/annot-app
+trunk serve --open
 ```
 
 `cargo test --workspace` runs the tests; they use small excerpts in

@@ -13,14 +13,14 @@
 | Annotated with something outside the pack | 2302 | 3454 |
 | **Graded** | **1267** | **641** |
 | Graded with tied annotations | 96 | 460 |
-| Got a suggestion (coverage) | 1221 (96.4%) | 576 (89.9%) |
-| **Right first (top-1)** | **91.9%** | **81.7%** |
-| Right in top 3 | 93.4% | 84.2% |
+| Got a suggestion (coverage) | 1222 (96.4%) | 577 (90.0%) |
+| **Right first (top-1)** | **91.9%** | **82.1%** |
+| Right in top 3 | 93.4% | 84.4% |
 | Right first, counting the same chemistry under another id | 91.9% | 82.1% |
-| Right in top 5 | 93.7% | 84.7% |
-| First suggestion right, when there is one (precision) | 95.4% | 91.0% |
-| Mean reciprocal rank | 0.927 | 0.829 |
-| Lone suggestion right | 933 of 949 (98.3%) | 123 of 133 (92.5%) |
+| Right in top 5 | 93.6% | 84.7% |
+| First suggestion right, when there is one (precision) | 95.3% | 91.2% |
+| Mean reciprocal rank | 0.927 | 0.831 |
+| Lone suggestion right | 933 of 949 (98.3%) | 243 of 258 (94.2%) |
 
 ### Novel test models only
 
@@ -29,11 +29,11 @@
 | | Species | Reactions |
 |---|---|---|
 | Graded | 610 | 404 |
-| Got a suggestion (coverage) | 96.6% | 90.6% |
-| **Right first (top-1)** | **90.8%** | **82.2%** |
-| Right in top 3 | 92.8% | 83.9% |
+| Got a suggestion (coverage) | 96.7% | 90.8% |
+| **Right first (top-1)** | **90.8%** | **82.7%** |
+| Right in top 3 | 92.6% | 84.4% |
 | Right first, counting the same chemistry under another id | 90.8% | 82.7% |
-| First suggestion right, when there is one (precision) | 94.1% | 90.7% |
+| First suggestion right, when there is one (precision) | 93.9% | 91.0% |
 
 ## Confidence levels
 
@@ -41,18 +41,18 @@ How often the first suggestion was right, by the engine's own          confidenc
 
 | Models | Level | Species: share | Species: right | Reactions: share | Reactions: right |
 |---|---|---|---|---|---|
-| all | high | 69.2% | 99.4% | 24.0% | 99.3% |
-| all | likely | 27.0% | 90.9% | 70.3% | 91.6% |
-| all | uncertain | 3.8% | 54.3% | 5.7% | 48.5% |
-| novel | high | 70.8% | 99.3% | 28.4% | 100.0% |
-| novel | likely | 24.4% | 88.9% | 64.5% | 89.8% |
-| novel | uncertain | 4.8% | 42.9% | 7.1% | 61.5% |
+| all | high | 69.1% | 99.4% | 28.1% | 99.4% |
+| all | likely | 27.0% | 90.9% | 68.1% | 91.1% |
+| all | uncertain | 3.8% | 53.2% | 3.8% | 31.8% |
+| novel | high | 70.7% | 99.3% | 30.2% | 100.0% |
+| novel | likely | 24.4% | 88.9% | 65.7% | 89.6% |
+| novel | uncertain | 4.9% | 41.4% | 4.1% | 46.7% |
 
 ## Species not right first
 
-46 with no suggestion, 34 with only wrong ones, 22 right but ranked lower.
+45 with no suggestion, 35 with only wrong ones, 22 right but ranked lower.
 
-### No suggestion (first 40 of 46)
+### No suggestion (first 40 of 45)
 
 | Model | Id | Name | Annotated as | First suggestion |
 |---|---|---|---|---|
@@ -77,7 +77,6 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000575 | Bioamines | Bioamines | (Z)-3-aminoperacrylic acid (poaac) / 2-iminiopropionate (2amac) / trimethylammonium (tmam) / ethanolaminium (etha) / cysteaminium (cysam) | - |
 | BIOMD0000000590 | cp | cp | carbamoyl phosphate (cbp) | - |
 | BIOMD0000000590 | dho | dho | (S)-dihydroorotate (dhor__S) | - |
-| BIOMD0000000590 | oro | oro | orotate (orot) | - |
 | BIOMD0000000725 | AHMDHP | AHMDHP | 2-amino-6-(hydroxymethyl)-7,8-dihydropteridin-4-ol (2ahhmp) | - |
 | BIOMD0000000725 | DHNTP | DHNTP | 7,8-dihydroneopterin 3'-triphosphate (ahdt) | - |
 | BIOMD0000000725 | Gln | Gln | L-glutamine zwitterion (gln__L) | - |
@@ -96,8 +95,9 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000735 | FeRBC | FeRBC* | iron (fe3) / iron (fe2) | - |
 | BIOMD0000000735 | FeRBC_0 | FeRBC | iron (fe3) / iron (fe2) | - |
 | BIOMD0000000735 | FeRest | FeRest* | iron (fe3) / iron (fe2) | - |
+| BIOMD0000000735 | FeRest_0 | FeRest | iron (fe3) / iron (fe2) | - |
 
-### Wrong suggestions only (first 34 of 34)
+### Wrong suggestions only (first 35 of 35)
 
 | Model | Id | Name | Annotated as | First suggestion |
 |---|---|---|---|---|
@@ -117,7 +117,7 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000470 | s_0446 | alpha-D-Ribose 5-phosphate | D-ribofuranose 5-phosphate (r5p) | alpha-D-ribofuranose 5-phosphate (ar5p) |
 | BIOMD0000000470 | s_0654 | D-Glucosamine 6-phosphate | alpha-D-glucosamine 6-phosphate (gam6p) | 2-ammonio-2-deoxy-D-glucopyranose 6-phosphate (gam6p_any) |
 | BIOMD0000000470 | s_0979 | Hexadecenoyl-CoA (n-C16:1CoA) | (E)-hexadec-2-enoyl-CoA (hdd2coa) | palmitoleoyl-CoA (hdcoa) |
-| BIOMD0000000495 | mw73259e20_240e_4f3a_b2e0_9ca248658898 | SerE | D-serine zwitterion (ser__D) / L-serine zwitterion (ser__L) | glycine zwitterion (gly) |
+| BIOMD0000000495 | mw73259e20_240e_4f3a_b2e0_9ca248658898 | SerE | D-serine zwitterion (ser__D) / L-serine zwitterion (ser__L) | O-acetyl-L-serine zwitterion (acser) |
 | BIOMD0000000495 | mwf166ad55_4ff0_49fb_95d2_b657ad7653d5 | PE | 1,2-distearoylphosphatidylethanolamine zwitterion (pe180) / PE(18:1(11Z)/18:1(9Z)) (pe18111Z1819Z) / 1,2-dihexadecanoyl-sn-glycero-3-phosphoethanolamine zwitterion (pe160) | O-phosphonatoethanaminium (ethamp) |
 | BIOMD0000000510 | Rib_g | Rib_g | D-ribofuranose (rib__D) | 2-deoxy-D-ribofuranose (drib) |
 | BIOMD0000000515 | Rib5P_g | Rib5P_g | D-ribofuranose (rib__D) | aldehydo-D-arabinose 5-phosphate (ara5p) |
@@ -126,7 +126,8 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000565 | cg6p | Glucose-6-Phosphate | D-glucose 6-phosphate (g6p_any) | alpha-D-glucose 6-phosphate (g6p_A) |
 | BIOMD0000000575 | Neuromelanin | Neuromelanin | 5,6-dihydroxyindole (CE4888) | 3-sulfino-L-alanine (3sala) |
 | BIOMD0000000590 | ca | ca | N-carbamoyl-L-aspartate (cbasp) | calcium (ca2) |
-| BIOMD0000000590 | omp | omp | orotidine 5'-phosphate (orot5p) | ditrans,polycis-undecaprenyl phosphate (udcpp) |
+| BIOMD0000000590 | omp | omp | orotidine 5'-phosphate (orot5p) | UDP (udp) |
+| BIOMD0000000590 | oro | oro | orotate (orot) | cytidine 5'-monophosphate (cmp) |
 | BIOMD0000000725 | CM | CM | chorismate (chor) | chloramphenicol (cm) |
 | BIOMD0000000725 | Formyl | Formyl | formate (for) | water (h2o) |
 | BIOMD0000000725 | fTHFGlu | fTHFGlu | 10-formyltetrahydrofolate (10fthf_any) / (6R)-10-formyltetrahydrofolate (10fthf) | L-glutamate (glu__L) |
@@ -157,17 +158,17 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000725 | AHMDPP | AHMDPP | (2-amino-4-hydroxy-7,8-dihydropteridin-6-yl)methyl diphosphate (2ahhmd) | 2-amino-6-(hydroxymethyl)-7,8-dihydropteridin-4-ol (2ahhmp) (right one at 2) |
 | BIOMD0000000725 | DHSK | DHSK | 3-dehydroshikimate (3dhsk) | 7-phospho-2-dehydro-3-deoxy-D-arabino-heptonate (2dda7p) (right one at 2) |
 | BIOMD0000000050 | Gly |  | glycine zwitterion (gly) | glycerol (glyc) (right one at 3) |
-| BIOMD0000000495 | mw8796c919_9251_4970_8f87_0bca9ecfeb5c | Etn | ethanolaminium (etha) | sphinganine 1-phosphate (sph1p) (right one at 3) |
 | BIOMD0000000725 | Gly | Gly | glycine zwitterion (gly) | glycerol (glyc) (right one at 3) |
 | BIOMD0000001005 | NAM | NAM | nicotinamide (ncam) | nicotinate D-ribonucleotide (nicrnt) (right one at 4) |
-| BIOMD0000000495 | mwcb834e43_dc57_45ae_9452_f4c10955caf1 | PCho | choline phosphate (cholp) | sphinganine 1-phosphate (sph1p) (right one at 5) |
-| BIOMD0000000505 | NADHMAT |  | NADH (nadh) | succinate (succ) (right one at 5) |
+| BIOMD0000000495 | mw8796c919_9251_4970_8f87_0bca9ecfeb5c | Etn | ethanolaminium (etha) | sphinganine 1-phosphate (sph1p) (right one at 5) |
+| BIOMD0000000505 | NADHMAT |  | NADH (nadh) | acetoacetate (acac) (right one at 5) |
+| BIOMD0000000495 | mwcb834e43_dc57_45ae_9452_f4c10955caf1 | PCho | choline phosphate (cholp) | sphinganine 1-phosphate (sph1p) (right one at 6) |
 
 ## Reactions not right first
 
-65 with no suggestion, 33 with only wrong ones, 19 right but ranked lower.
+64 with no suggestion, 34 with only wrong ones, 17 right but ranked lower.
 
-### No suggestion (first 20 of 65)
+### No suggestion (first 20 of 64)
 
 | Model | Id | Name | Annotated as | First suggestion |
 |---|---|---|---|---|
@@ -190,53 +191,51 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000590 | r1 | r1 | HCGALm (HCGALm) / hydrogen-carbonate:L-glutamine amido-ligase (ADP-forming, carbamate-phosphorylating) (CBPSn) / carbamoyl-phosphate synthase (glutamine-hydrolysing) (CBPS) | - |
 | BIOMD0000000590 | r2 | r2 | carbamoyl-phosphate:L-aspartate carbamoyltransferase (ASPCTn) / aspartate carbamoyltransferase (ASPCT_1) / carbamoyl-phosphate:L-aspartate carbamoyltransferase (ASPCTm) | - |
 | BIOMD0000000590 | r3 | r3 | (S)-dihydroorotate amidohydrolase (DHORTSn) / (S)-dihydroorotate amidohydrolase (DHR) / dihydroorotase (DHORTS) | - |
-| BIOMD0000000590 | r5 | r5 | orotate phosphoribosyltransferase (ORPT) | - |
+| BIOMD0000000605 | v2 | v2 | hexokinase (D-glucose:ATP) (HEX1) | - |
 
-### Wrong suggestions only (first 20 of 33)
+### Wrong suggestions only (first 20 of 34)
 
 | Model | Id | Name | Annotated as | First suggestion |
 |---|---|---|---|---|
-| BIOMD0000000015 | ampd |  | AMP aminohydrolase (AMPDg) / R_Adenosine_monophosphate_deaminase (AMPDA) | IMP cyclohydrolase (IMPC) |
+| BIOMD0000000015 | ampd |  | AMP aminohydrolase (AMPDg) / R_Adenosine_monophosphate_deaminase (AMPDA) | insosine kinase (INSK) |
 | BIOMD0000000015 | gmps |  | GMPS_glu_m (GMPS_glu_m) / GMP synthase (GMPS2) | GMP synthase (GMPS) |
 | BIOMD0000000015 | gnuc |  | 5'-nucleotidase (GMP) (NTD9) / 5'-nucleotidase (GMP) (NTD9pp) / _5'-nucleotidase (GMP), extracellular (NTD9e) / _5'-nucleotidase (GMP), lysosome (NTD9l) | guanine phosphoribosyltransferase (GUAPRT) |
-| BIOMD0000000015 | inuc |  | 5'-nucleotidase (IMP) (NTD11) / 5'-nucleotidase (IMP) (NTD11pp) | HXPRTg (HXPRTg) |
-| BIOMD0000000015 | pyr |  | orotate phosphoribosyltransferase (ORPT) | adenine phosphoribosyltransferase (ADPT2) |
-| BIOMD0000000070 | vGSHox | Glutathione oxidation | glutathioneoxidoreductase(apicoplast) (GDR_nadp_h) / glutathione oxidoreductase (GTHOr) / R_glutathione_oxidoreductase (GTHOm) | glutathioneperoxidase(apicoplast) (GTHP_api) |
+| BIOMD0000000015 | inuc |  | 5'-nucleotidase (IMP) (NTD11) / 5'-nucleotidase (IMP) (NTD11pp) | hypoxanthine phosphoribosyltransferase (Hypoxanthine) (HXPRT) |
+| BIOMD0000000070 | vGSHox | Glutathione oxidation | glutathioneoxidoreductase(apicoplast) (GDR_nadp_h) / glutathione oxidoreductase (GTHOr) / R_glutathione_oxidoreductase (GTHOm) | R_glutathione_peroxidase (GTHPe) |
 | BIOMD0000000080 | Reaction_6 | Hydrolysis of GTP to GDP | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | phytoene synthase (PSY) |
 | BIOMD0000000085 | reaction_20 | RG*AT hydrolysis | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | aspartase racemase (ASPR) |
 | BIOMD0000000085 | reaction_3 | G*T  hydrolysis | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | Conversion of CHEBI:15903 to CHEBI:4167, because one is an instance of the other. (GALM1) |
 | BIOMD0000000450 | V_CTGL | V_CTGL | gamma-glutamylcysteine synthetase (GLUCYS) / gamma-Glutamylcysteine synthase (GCL) | CYSPH-RXN.c (CYSTS_1) |
 | BIOMD0000000450 | V_MTHFR | V_MTHFR | methylenetetrahydrofolate dehydrogenase (NADP) (MTHFD) / R_methylenetetrahydrofolate_dehydrogenase__NADP___mitochondrial (MTHFDm) | MTHFR (MTHFR) |
+| BIOMD0000000470 | r_0664 | glucose-6-phosphate isomerase | alpha-D-Glucose 6-phosphate ketol-isomerase (PGI1) / alpha-D-Glucose 6-phosphate ketol-isomerase (PGI1c) | glucose-6-phosphate isomerase (PGI) |
 | BIOMD0000000470 | r_1962 | NAD(P) transhydrogenase (periplasm) | NAD transhydrogenase (NADTRHD) / NADPH:NAD+ oxidoreductase (NNOR) | NAD(P) transhydrogenase (periplasm) (THD2pp) |
-| BIOMD0000000590 | r6 | r6 | orotidine-5'-phosphate decarboxylase (OMPDC) | UDP-N-acetylglucosamine:undecaprenylphosphate N-acetylglucosamine -1-phosphate transferase (ACGAMT) |
+| BIOMD0000000590 | r5 | r5 | orotate phosphoribosyltransferase (ORPT) | UMP kinase (UTP) (UMPK3) |
+| BIOMD0000000590 | r6 | r6 | orotidine-5'-phosphate decarboxylase (OMPDC) | UMP kinase (UTP) (UMPK3) |
 | BIOMD0000000590 | r7 | r7 | nucleoside-diphosphate kinase (ATP:UDP) (NDPK2) / nucleoside-diphosphate kinase (ATP:UDP), mitochondrial (NDPK2m) / nucleoside-diphosphate kinase (ATP:UDP), nuclear (NDPK2n) | UMP kinase (UTP) (UMPK3) |
 | BIOMD0000000605 | v6 | v6 | glycerol-3-phosphatase (G3PT) | Glycerol dehydrogenase (GLYCDx) |
-| BIOMD0000000690 | FolP | FolP | dihydropteroate synthase (DHPS2_1) / R_dihydropteroate_synthase__mitochondrial (FOLD3m) | R_dihydropteroate_synthase__mitochondrial (DHPSm) |
+| BIOMD0000000690 | FolP | FolP | dihydropteroate synthase (DHPS2_1) / R_dihydropteroate_synthase__mitochondrial (FOLD3m) | R_dihydropteroate_synthase (DHPS) |
 | BIOMD0000000725 | R24 | R24 - 10-Formyltetrahydrofolate synthetase | R_formate_tetrahydrofolate_ligase__mitochondrial_irreversible (FTHFLmi) / formate-tetrahydrofolate ligase (FTHFLi) | THFGLUH (THFGLUH) |
 | BIOMD0000000725 | R26 | R26 - 10-Formyltetrahydrofolate dehydrogenase | formyltetrahydrofolate dehydrogenase (FTHFDH) | THFGLUH (THFGLUH) |
 | BIOMD0000001090 | R_LCTO_cytop | (S)-lactate+oxygen=>pyruvate+hydrogenperoxide | (S)-lactate:oxygen 2-oxidoreductase (decarboxylating) (LO) | L-lactate dehydrogenase (LDH_L) |
-| BIOMD0000001090 | R_R00014_C3_cytop | Pyruvate+Thiamindiphosphate=>2-(alpha-Hydroxyethyl)thiaminediphosphate+CO2 | 2-aceto-2-hydroxybutanoate synthase (ACHBS) / acetolactate synthase (ACLS) / R_2_aceto_2_hydroxybutanoate_synthase__mitochondrial (ACHBSm) / R_acetolactate_synthase__mitochondrial (ACLSm) / R_pyruvate_decarboxylase (PYRDC) / 2-acetolactate pyruvate-lyase (carboxylating) (PPATDh) / pyruvate carboxy-lyase (acetaldehyde-forming) (PYRDC_1) | Acetolactate synthase (step 1) (ACLSa) |
 
-### Right answer ranked lower (first 19 of 19)
+### Right answer ranked lower (first 17 of 17)
 
 | Model | Id | Name | Annotated as | First suggestion |
 |---|---|---|---|---|
-| BIOMD0000000070 | vLDHNADH | Lactate dehydrogenase | L-lactate dehydrogenase (LDH_L) / L-lactate dehydrogenase (LDH_Lm) / (S)-Lactate:NAD+ oxidoreductase (LLDHh) | lactate dehydrogenase (LDHm) (right one at 2) |
 | BIOMD0000000070 | vLDHNADPH | Lactate dehydrogenase | L-lactate dehydrogenase (LDH_L) / L-lactate dehydrogenase (LDH_Lm) / (S)-Lactate:NAD+ oxidoreductase (LLDHh) | lactate dehydrogenase (LDHm) (right one at 2) |
-| BIOMD0000000225 | vfba | vfba | D-fructose-1,6-bisphosphate D-glyceraldehyde-3-phosphate-lyase (glycerone-phosphate-forming) (FBAg) / fructose-bisphosphate aldolase (FBA) | D-Fructose-1,6-bisphosphate 1-phosphohydrolase (FBPg) (right one at 2) |
+| BIOMD0000000245 | r3 | Pyruvate Dehydrogenase | pyruvate dehydrogenase(apicoplast) (PDHapi) / pyruvate dehydrogenase (PDH) / R_pyruvate_dehydrogenase (PDHm) | R_pyruvate_decarboxylase (PYRDC) (right one at 2) |
 | BIOMD0000000470 | r_0697 | glycerate kinase | GLYPT (GLYPT) / glycerate kinase (GLYCK) | glycerate kinase (GLYCK2) (right one at 2) |
-| BIOMD0000000470 | r_1230 | protoporphyrinogen oxidase (aerobic) | Protoporphyrinogen oxidase (aerobic) (PPPGO2_1) / protoporphyrinogen IX oxidase (PPPGO_1) | protoporphyrinogen oxidase (aerobic) (PPPGO) (right one at 2) |
-| BIOMD0000000470 | r_1265 | riboflavin synthase | riboflavin synthase (RBFSb) / Riboflavin synthase (RIBFS) | riboflavin synthase (RBFSa_1) (right one at 2) |
-| BIOMD0000001090 | R_R01056_C3_cytop | D-Ribulose5-phosphate<=>D-Ribose5-phosphate | ribose-5-phosphate isomerase (RPI) / Ribose-5-phosphate isomerase (RPIh) | RPIg (RPIg) (right one at 2) |
-| BIOMD0000001090 | R_R01061_C3_cytop | D-Glyceraldehyde3-phosphate+Orthophosphate+NAD+=>3-Phospho-D-glyceroylphosphate+NADH+H+ | glyceraldehyde-3-phosphate dehydrogenase (GAPD) / D-glyceraldehyde-3-phosphate:NAD+ oxidoreductase (phosphorylating) (GAPDHf) / D-glyceraldehyde-3-phosphate:NAD+ oxidoreductase (phosphorylating) (GAPDHh) | GAPDg (GAPDg) (right one at 2) |
-| BIOMD0000001090 | R_R08639_C3_cytop | D-Glucose1-phosphate<=>D-Glucose6-phosphate | phosphoglucomutase (PGMT) | phosphoglucose mutase (PGMTh) (right one at 2) |
-| BIOMD0000000470 | r_0664 | glucose-6-phosphate isomerase | alpha-D-Glucose 6-phosphate ketol-isomerase (PGI1) / alpha-D-Glucose 6-phosphate ketol-isomerase (PGI1c) | glucose-6-phosphate isomerase (PGI) (right one at 3) |
+| BIOMD0000000635 | revreaction_38 | revreaction_38 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 2) |
+| BIOMD0000000635 | revreaction_39 | revreaction_39 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 2) |
+| BIOMD0000000635 | revreaction_40 | revreaction_40 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 2) |
+| BIOMD0000000635 | revreaction_41 | revreaction_41 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 2) |
+| BIOMD0000001090 | R_R04198_C3_cytop | (2S,4S)-4-Hydroxy-2,3,4,5-tetrahydrodipicolinate+NADH+H+=>2,3,4,5-Tetrahydrodipicolinate+NAD++H2O | Dihydrodipicolinate reductase (NADH) reversible (DHDPRx_r) | 4-hydroxy-tetrahydrodipicolinate reductase (H4THDPR) (right one at 2) |
+| BIOMD0000000225 | vpfk | vpfk | PFKg (PFKg) / phosphofructokinase (PFK) | fructose-bisphosphatase (FBP) (right one at 3) |
 | BIOMD0000000470 | r_0761 | hexokinase (D-fructose:ATP) | hexokinase (D-glucose:ATP) (HEX1) | hexokinase (D-fructose:ATP) (HEX7) (right one at 3) |
-| BIOMD0000000635 | revreaction_38 | revreaction_38 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 3) |
-| BIOMD0000000635 | revreaction_39 | revreaction_39 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 3) |
-| BIOMD0000000635 | revreaction_40 | revreaction_40 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 3) |
-| BIOMD0000000635 | revreaction_41 | revreaction_41 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 3) |
+| BIOMD0000000470 | r_0925 | malate dehydrogenase | malate dehydrogenase (MDHi2) / R_malate_dehydrogenase__mitochondrial (MDHm) / R_malate_dehydrogenase__peroxisomal (MDHp) / (S)-malate:NAD+ oxidoreductase (MDHf) / (S)-malate:NAD+ oxidoreductase (MDHh) | Malate dehydrogenase (ubiquinone 8 as acceptor) (MDH2) (right one at 3) |
+| BIOMD0000000470 | r_1230 | protoporphyrinogen oxidase (aerobic) | Protoporphyrinogen oxidase (aerobic) (PPPGO2_1) / protoporphyrinogen IX oxidase (PPPGO_1) | protoporphyrinogen oxidase (aerobic) (PPPGO) (right one at 3) |
+| BIOMD0000000590 | r8 | r8 | CTPS2n (CTPS2n) / CTP synthase (glutamine) (CTPS2) | dCTP deaminase (DCTPD2_1) (right one at 3) |
+| BIOMD0000000725 | R6 | R6 - Phosphoenolpyruvate:3-phosphoshikimate 5-O-(1-carboxyvinyl)-transferase | 3-phosphoshikimate 1-carboxyvinyltransferase (PSCVT) / enolpyruvylshikimate phosphate synthase (PSCIT) | UDP-N-acetylglucosamine 1-carboxyvinyltransferase (UAGCVT_1) (right one at 3) |
 | BIOMD0000001055 | R11 | R11 | pyruvate carboxylase (PC) / pyruvate carboxylase (PCm) | oxaloacetate decarboxylase (OAADC) (right one at 3) |
-| BIOMD0000000225 | vpfk | vpfk | PFKg (PFKg) / phosphofructokinase (PFK) | D-Fructose-1,6-bisphosphate 1-phosphohydrolase (FBPg) (right one at 4) |
+| BIOMD0000000015 | pyr |  | orotate phosphoribosyltransferase (ORPT) | adenine phosphoribosyltransferase (ADPT2) (right one at 4) |
 | BIOMD0000000470 | r_0096 | 3-cis-2-trans-enoyl-CoA isomerase | dodecenoyl-Coenzyme A delta isomerase (DCIm) | 3-cis-2-trans-enoyl-CoA isomerase (CTECOAI7) (right one at 4) |
-| BIOMD0000000590 | r8 | r8 | CTPS2n (CTPS2n) / CTP synthase (glutamine) (CTPS2) | dCTP deaminase (DCTPD2_1) (right one at 4) |

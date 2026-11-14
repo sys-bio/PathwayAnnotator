@@ -107,7 +107,11 @@ impl Provider for Context {
                     .filter(|p| p.role != Role::Modifier && !anchors2.contains_key(&p.species))
                     .count();
                 let extra = leftover_core(pack, &f).saturating_sub(unknown);
-                let w = 0.8 + 0.6 * f.matched as f32 - 0.6 * f.missing as f32 - 0.2 * extra as f32
+                // Matched cofactors count a little: "F6P + ATP -> FBP + ADP"
+                // is the kinase, not the phosphatase run backwards.
+                let w = 0.8 + 0.6 * f.matched as f32 + 0.15 * f.currency_matched as f32
+                    - 0.6 * f.missing as f32
+                    - 0.2 * extra as f32
                     - 0.1 * f.currency_left as f32;
                 if w <= 0.0 {
                     continue;
@@ -229,9 +233,44 @@ fn fits(pack: &Pack, known: &[(EntityId, Side)], transport: bool) -> Vec<Fit> {
                 .max_by(|a, b| a.score.total_cmp(&b.score))
         })
         .collect();
-    out.sort_by(|a, b| b.score.total_cmp(&a.score).then(a.reaction.cmp(&b.reaction)));
+    // Best first; among equal fits, the plainest BiGG id first ("PFK"
+    // before its organism or compartment variant "PFKg").
+    out.sort_by(|a, b| {
+        b.score
+            .total_cmp(&a.score)
+            .then_with(|| bigg_rank(pack, a.reaction).cmp(&bigg_rank(pack, b.reaction)))
+    });
+    // Keep one reaction per chemistry: BiGG has the same reaction under
+    // several ids for different compartments and organisms.
+    let mut seen = BTreeSet::new();
+    out.retain(|f| seen.insert(chemistry(pack, f.reaction)));
     out.truncate(MAX_FITS);
     out
+}
+
+/// Sorts plain BiGG ids before variants: shorter first, then by text.
+fn bigg_rank(pack: &Pack, r: ReactionId) -> (usize, String) {
+    let id = pack
+        .reaction(r)
+        .xrefs
+        .iter()
+        .find(|x| pack.namespace_prefix(x.ns) == "bigg.reaction")
+        .map(|x| pack.str(x.id).to_string())
+        .unwrap_or_default();
+    (if id.is_empty() { usize::MAX } else { id.len() }, id)
+}
+
+/// A reaction's participants and stoichiometry, ignoring compartments: the
+/// same for a reaction's compartment variants.
+fn chemistry(pack: &Pack, r: ReactionId) -> Vec<(EntityId, i64)> {
+    let mut v: Vec<(EntityId, i64)> = pack
+        .reaction(r)
+        .participants
+        .iter()
+        .map(|p| (p.entity, (p.coef * 1000.0).round() as i64))
+        .collect();
+    v.sort_unstable();
+    v
 }
 
 /// How pack reaction `r`, read forwards or (if `flip`) backwards, fits.
