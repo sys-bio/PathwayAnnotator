@@ -1,0 +1,15 @@
+[package]
+name = "annot-model"
+description = "The model being annotated: loads SBML or Antimony, gives the engine its view, reads existing annotations, applies accepted ones with undo, writes SBML. No I/O; works in WebAssembly."
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+annot-engine = { path = "../annot-engine" }
+antimony-rs = { path = "../antimony", features = ["sbml"] }
+kpack = { path = "../kpack" }
+sbml-io = { path = "../sbml-io" }
+
+[dev-dependencies]
+kpack-build = { path = "../kpack-build" }

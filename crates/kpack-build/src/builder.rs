@@ -109,6 +109,7 @@ impl PackBuilder {
                 label: b.strings.intern(def.label),
                 pattern: b.strings.intern(def.pattern),
                 legacy_urns: def.legacy_urns.iter().map(|u| b.strings.intern(u)).collect(),
+                id_prefix: b.strings.intern(def.id_prefix),
             };
             b.ns_ids.insert(def.prefix, b.namespaces.len() as NsId);
             b.namespaces.push(ns);

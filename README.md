@@ -24,7 +24,9 @@ for the design, data sources and results.
   "Glc + ATP -> S3 + ADP" makes S3 glucose 6-phosphate.
 
 On curated BioModels the engine has never seen, it puts the right answer
-first for about 91% of species and 82% of reactions (metabolism).
+first for about 91% of species and 82% of reactions (metabolism). Each
+suggestion carries a confidence level; "high" ones were right about 99% of
+the time.
 
 ## Layout
 
@@ -32,7 +34,8 @@ first for about 91% of species and 82% of reactions (metabolism).
 |---|---|
 | `kpack` | The knowledge pack: data model, name and id indexes, encode/decode (WebAssembly) |
 | `kpack-build` | Builds the pack from BiGG, ChEBI and BioModels (native) |
-| `annot-engine` | The suggestion engine and its providers (WebAssembly) |
+| `annot-engine` | The suggestion engine, its providers and confidence levels (WebAssembly) |
+| `annot-model` | Loads SBML/Antimony, applies accepted annotations with undo, writes SBML (WebAssembly) |
 | `annot-cli` | The benchmark, later batch annotation (native) |
 | `sbml-io`, `antimony` | SBML and Antimony reading and writing |
 

@@ -124,6 +124,42 @@ pub struct Results {
     pub novel_models: usize,
     pub novel_species: Score,
     pub novel_reactions: Score,
+    /// One row per graded element with a suggestion, for calibrating
+    /// confidence levels.
+    pub observations: Vec<Observation>,
+}
+
+/// A first suggestion and whether it was right.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Observation {
+    pub reaction: bool,
+    pub novel: bool,
+    /// What the first suggestion rests on.
+    pub basis: annot_engine::Basis,
+    pub score: f32,
+    /// Second best score / best score (0 when alone).
+    pub ratio: f32,
+    pub right: bool,
+    /// The engine's own confidence level for it.
+    pub level: annot_engine::Confidence,
+}
+
+fn observe(key: &Key, cands: &[Candidate], reaction: bool, novel: bool) -> Option<Observation> {
+    let Key::Known { accept, .. } = key else {
+        return None;
+    };
+    let first = cands.first()?;
+    let basis = annot_engine::basis(first);
+    let second = cands.get(1).map_or(0.0, |c| c.score);
+    Some(Observation {
+        reaction,
+        novel,
+        basis,
+        score: first.score,
+        ratio: if first.score > 0.0 { second / first.score } else { 0.0 },
+        right: accept.contains(&first.target),
+        level: annot_engine::confidence(cands)?,
+    })
 }
 
 /// A test model is novel if the Jaccard overlap of its species names with
@@ -181,6 +217,12 @@ pub fn grade(pack: &Pack, g: &Graded, novel: bool, results: &mut Results) {
     let s = annot_engine::annotate(pack, &g.model);
     let strict = |_: Target, _: Target| false;
     let same_reaction = |a: Target, b: Target| equivalent_reactions(pack, a, b);
+    for (i, key) in g.species.iter().enumerate() {
+        results.observations.extend(observe(key, &s.species[i], false, novel));
+    }
+    for (i, key) in g.reactions.iter().enumerate() {
+        results.observations.extend(observe(key, &s.reactions[i], true, novel));
+    }
     results.models += 1;
     if novel {
         results.novel_models += 1;
@@ -356,6 +398,8 @@ pub fn report(r: &Results, pack: &Pack, set: &str, date: &str, providers: &[&str
         );
     }
 
+    confidence_section(&mut o, r, set == "test");
+
     misses_section(&mut o, "Species", &r.species_misses, 40);
     misses_section(&mut o, "Reactions", &r.reaction_misses, 20);
 
@@ -366,6 +410,39 @@ pub fn report(r: &Results, pack: &Pack, set: &str, date: &str, providers: &[&str
         }
     }
     o
+}
+
+/// How often each confidence level was right.
+fn confidence_section(o: &mut String, r: &Results, with_novel: bool) {
+    use annot_engine::Confidence::{High, Likely, Uncertain};
+    let _ = writeln!(
+        o,
+        "
+## Confidence levels
+
+How often the first suggestion was right, by the engine's own          confidence level (`annot_engine::confidence`). \"Share\" is the share of graded elements          with a suggestion.
+"
+    );
+    let subsets: &[(&str, bool)] = if with_novel { &[("all", false), ("novel", true)] } else { &[("all", false)] };
+    let _ = writeln!(o, "| Models | Level | Species: share | Species: right | Reactions: share | Reactions: right |
+|---|---|---|---|---|---|");
+    for &(label, novel_only) in subsets {
+        for level in [High, Likely, Uncertain] {
+            let cell = |reaction: bool| {
+                let pool: Vec<_> = r
+                    .observations
+                    .iter()
+                    .filter(|x| x.reaction == reaction && (!novel_only || x.novel))
+                    .collect();
+                let at: Vec<_> = pool.iter().filter(|x| x.level == level).collect();
+                let right = at.iter().filter(|x| x.right).count();
+                (pct(at.len(), pool.len()), pct(right, at.len()))
+            };
+            let (ss, sr) = cell(false);
+            let (rs, rr) = cell(true);
+            let _ = writeln!(o, "| {label} | {} | {ss} | {sr} | {rs} | {rr} |", level.label());
+        }
+    }
 }
 
 fn misses_section(o: &mut String, title: &str, misses: &[Miss], per_kind: usize) {

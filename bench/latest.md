@@ -35,6 +35,19 @@
 | Right first, counting the same chemistry under another id | 90.8% | 82.7% |
 | First suggestion right, when there is one (precision) | 94.1% | 90.7% |
 
+## Confidence levels
+
+How often the first suggestion was right, by the engine's own          confidence level (`annot_engine::confidence`). "Share" is the share of graded elements          with a suggestion.
+
+| Models | Level | Species: share | Species: right | Reactions: share | Reactions: right |
+|---|---|---|---|---|---|
+| all | high | 69.2% | 99.4% | 24.0% | 99.3% |
+| all | likely | 27.0% | 90.9% | 70.3% | 91.6% |
+| all | uncertain | 3.8% | 54.3% | 5.7% | 48.5% |
+| novel | high | 70.8% | 99.3% | 28.4% | 100.0% |
+| novel | likely | 24.4% | 88.9% | 64.5% | 89.8% |
+| novel | uncertain | 4.8% | 42.9% | 7.1% | 61.5% |
+
 ## Species not right first
 
 46 with no suggestion, 34 with only wrong ones, 22 right but ranked lower.

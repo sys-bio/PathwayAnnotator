@@ -107,3 +107,23 @@ fn the_test_set_can_be_held_out() {
     assert!(src.version.contains("test set excluded"), "{}", src.version);
     assert_eq!(src.license, "CC0 1.0");
 }
+
+#[test]
+fn the_pack_reads_annotation_uris_itself() {
+    // The same resolution kpack-build does at build time, from the pack
+    // alone, as the browser app will.
+    let (p, _) = build(false);
+    let atp = Target::Entity(entity(&p, "atp"));
+    for uri in [
+        "http://identifiers.org/chebi/CHEBI:15422",
+        "https://identifiers.org/CHEBI:15422",
+        "urn:miriam:obo.chebi:CHEBI%3A15422",
+        "http://identifiers.org/obo.chebi/CHEBI:15422",
+        "http://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:15422",
+        "urn:miriam:kegg.compound:C00002",
+    ] {
+        let found: Vec<Target> = p.find_resource(uri).into_iter().map(|(t, _)| t).collect();
+        assert_eq!(found, [atp], "{uri}");
+    }
+    assert!(p.find_resource("http://identifiers.org/uniprot/P12345").is_empty());
+}

@@ -1,12 +1,11 @@
 //! Reading an SBML model for the benchmark: what the engine may see
 //! ([`annot_engine::Model`]), and the answer key from its annotations, which
-//! the engine never sees.
+//! the engine never sees. Both come from [`annot_model`], as they will in
+//! the app.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-
-use annot_engine::{Compartment, Model, Participant, Reaction, Role, Species};
-use kpack::{Pack, Target, XrefScope};
-use kpack_build::namespaces;
+use annot_engine::Model;
+use annot_model::{Element, Resolution};
+use kpack::{Pack, Target};
 
 /// What an element's annotations say it is.
 #[derive(Clone, Debug, PartialEq)]
@@ -22,6 +21,16 @@ pub enum Key {
     Known { accept: Vec<Target>, tie: bool },
 }
 
+impl From<Resolution> for Key {
+    fn from(r: Resolution) -> Key {
+        match r {
+            Resolution::Unannotated => Key::Unannotated,
+            Resolution::OutsidePack => Key::OutsidePack,
+            Resolution::Known { targets, tie, .. } => Key::Known { accept: targets, tie },
+        }
+    }
+}
+
 /// One model, ready to grade.
 pub struct Graded {
     pub id: String,
@@ -32,125 +41,26 @@ pub struct Graded {
 
 /// Reads `xml` (model `id`) and resolves its annotations against `pack`.
 pub fn read(id: &str, xml: &str, pack: &Pack) -> Result<Graded, String> {
-    let read = sbml_io::read(xml).map_err(|d| {
-        d.first()
-            .map(|d| format!("{d:?}"))
-            .unwrap_or_else(|| "unreadable".into())
-    })?;
-    let doc = read.document;
-    let mut out = Graded {
-        id: id.to_string(),
-        model: Model::default(),
-        species: Vec::new(),
-        reactions: Vec::new(),
-    };
-    let Some(m) = &doc.model else {
-        return Ok(out);
-    };
-    let resources = |meta: &sbml_io::Meta| -> Vec<String> {
-        let Some(xml) = &meta.annotation else {
-            return Vec::new();
-        };
-        sbml_io::miriam::read_annotation(xml, &doc.namespaces)
-            .terms
-            .into_iter()
-            .filter(|t| !t.model && (t.qualifier == "is" || t.qualifier == "isVersionOf"))
-            .flat_map(|t| t.resources)
-            .collect()
-    };
-
-    for c in &m.compartments {
-        out.model.compartments.push(Compartment {
-            id: c.id.clone(),
-            name: c.name.clone(),
-        });
-    }
-    let mut index: HashMap<&str, usize> = HashMap::new();
-    for (i, s) in m.species.iter().enumerate() {
-        index.insert(s.id.as_str(), i);
-        out.model.species.push(Species {
-            id: s.id.clone(),
-            name: s.name.clone(),
-            compartment: Some(s.compartment.clone()),
-        });
-        out.species.push(key(pack, &resources(&s.meta), false));
-    }
-    for r in &m.reactions {
-        let mut participants = Vec::new();
-        let sides = [(&r.reactants, Role::Reactant), (&r.products, Role::Product)];
-        for (refs, role) in sides {
-            for sr in refs {
-                if let Some(&i) = index.get(sr.species.as_str()) {
-                    participants.push(Participant {
-                        species: i,
-                        role,
-                        stoichiometry: sr.stoichiometry.unwrap_or(1.0).abs(),
-                    });
-                }
-            }
-        }
-        for mr in &r.modifiers {
-            if let Some(&i) = index.get(mr.species.as_str()) {
-                participants.push(Participant {
-                    species: i,
-                    role: Role::Modifier,
-                    stoichiometry: 1.0,
-                });
-            }
-        }
-        out.model.reactions.push(Reaction {
-            id: r.id.clone(),
-            name: r.name.clone(),
-            participants,
-        });
-        out.reactions.push(key(pack, &resources(&r.meta), true));
-    }
-    Ok(out)
-}
-
-/// The answer key for one element from its resources. Each resource votes
-/// for every target it leads to; exact ids win over broader or narrower.
-fn key(pack: &Pack, resources: &[String], reaction: bool) -> Key {
-    if resources.is_empty() {
-        return Key::Unannotated;
-    }
-    let mut exact: BTreeMap<Target, usize> = BTreeMap::new();
-    let mut related: BTreeMap<Target, usize> = BTreeMap::new();
-    for uri in resources {
-        let Some((written, id)) = kpack::split_resource(uri) else {
-            continue;
-        };
-        let Some((def, id)) = namespaces::resolve(&written, &id) else {
-            continue;
-        };
-        let mut voted = BTreeSet::new();
-        for (target, scope) in pack.find_xref_related(def.prefix, &id) {
-            let fits = matches!(target, Target::Reaction(_)) == reaction;
-            if !fits || !voted.insert((target, scope == XrefScope::Exact)) {
-                continue;
-            }
-            let tally = if scope == XrefScope::Exact { &mut exact } else { &mut related };
-            *tally.entry(target).or_default() += 1;
-        }
-    }
-    let votes = if exact.is_empty() { related } else { exact };
-    let Some(&best) = votes.values().max() else {
-        return Key::OutsidePack;
-    };
-    let accept: Vec<Target> = votes
-        .into_iter()
-        .filter(|(_, n)| *n == best)
-        .map(|(t, _)| t)
+    let w = annot_model::load_sbml(xml).map_err(|e| e.to_string())?;
+    let model = w.engine_model();
+    let species = (0..model.species.len())
+        .map(|i| w.resolution(pack, Element::Species(i)).into())
         .collect();
-    Key::Known {
-        tie: accept.len() > 1,
-        accept,
-    }
+    let reactions = (0..model.reactions.len())
+        .map(|i| w.resolution(pack, Element::Reaction(i)).into())
+        .collect();
+    Ok(Graded {
+        id: id.to_string(),
+        model,
+        species,
+        reactions,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use annot_engine::Role;
     use kpack_build::PackBuilder;
     use kpack_build::sources::{bigg, chebi};
     use std::path::Path;

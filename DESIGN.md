@@ -46,10 +46,14 @@ Dependency graph (arrows = "depends on"):
 
 ```
   kpack-build --> kpack
-  annot-engine --> kpack, annot-model
-  annot-model --> sbml-io, antimony-rs
+  annot-engine --> kpack
+  annot-model --> annot-engine, kpack, sbml-io, antimony-rs
   annot-app --> annot-engine, annot-model, kpack
-  annot-cli --> annot-engine, annot-model, kpack
+  annot-cli --> annot-engine, annot-model, kpack, kpack-build
+
+(Changed 2026-11-14: the engine has its own SBML-free input type,
+`annot_engine::Model`, and `annot-model` produces it, so `annot-model`
+depends on the engine rather than the other way round.)
 ```
 
 Rules:
@@ -470,6 +474,38 @@ BioModels source notes (`sources/biomodels.rs`, CC0):
   the pack (proteins, Reactome, etc.); 18,194 names kept, 841 dropped as
   noise. Pack 2.0 MB. No pack format change.
 
+## 5.2 The model being annotated (`annot-model`)
+
+Status (2026-11-14): implemented; builds for WebAssembly.
+
+- `load` reads SBML (Level 2 V1-5, Level 3 V1-2) or Antimony (converted to
+  SBML L3V2 through `antimony-rs`); `Workspace::to_sbml` writes it back in
+  the level and version it was read in.
+- `Workspace::engine_model` is the engine's view. `Workspace::resolution`
+  says what an element is already annotated as in the pack, by the same
+  voting rule the BioModels source and the benchmark use (the benchmark now
+  reads models through `annot-model`).
+- `Pack::resolve_resource` / `find_resource` read annotation URIs in every
+  form models use, from the pack alone (no `kpack-build`), so the browser
+  app can too. This needed `Namespace::id_prefix` (pack format version 4).
+- Edits: `accept` (one undoable step: `bqbiol:is` terms from `uris_for`,
+  plus an SBO term if the element has none: 247 molecule, 176 reaction,
+  185 transport), `add_terms`, `remove_term`, `set_sbo`, `undo`, `redo`.
+  Accepted URIs are compact identifiers.org form
+  (`https://identifiers.org/CHEBI:15422`): one ChEBI id (the neutral form
+  when known) and the KEGG compound for a molecule; Rhea, EC and KEGG
+  reaction ids for a reaction; never secondary or broader ids.
+- Safety: an edit changes only the element's MIRIAM terms. Other tools'
+  annotation XML, history, notes and RDF descriptions the reader does not
+  understand are written back unchanged; a new `metaid` is made unique; an
+  annotation whose RDF block cannot be read at all is not edited
+  (`EditError::UnreadableRdf`).
+- Known limitation: MIRIAM terms inside an RDF description that also holds
+  other statements are preserved but not seen by `terms` /
+  `identity_uris`, so such an element looks unannotated to the annotator.
+- Not yet: writing annotations back into Antimony text (an Antimony model
+  is exported as SBML), and SBML -> Antimony.
+
 ## 6. Benchmark (`annot-cli bench`)
 
 Status (2026-11-14): implemented.
@@ -577,6 +613,38 @@ How it works (`providers/context.rs`):
 Remaining reaction errors are mostly reactions with only one anchored
 species, where several enzymes act on it (nucleotide metabolism:
 nucleotidases vs kinases vs synthases).
+
+### Confidence
+
+`annot_engine::confidence` gives the first suggestion a level the app can
+show. It rests on what the suggestion is based on
+(`annot_engine::basis`: a direct name match, a decoded name or embedded
+id, or context only), its score, and its lead over the runner-up:
+
+- High: a name match with no competitor scoring >= 2.0, or a decoded match
+  scoring >= 2.0 with a clear lead (runner-up <= 0.75 x best).
+- Likely: other name matches >= 1.5, decoded >= 1.0, context >= 1.5.
+- Uncertain: the rest.
+
+The benchmark reports how often each level is right (`bench --observations
+FILE` also dumps every graded first suggestion for re-calibration).
+2026-11-14:
+
+| Models | Level | Species: share | Species: right | Reactions: share | Reactions: right |
+|---|---|---|---|---|---|
+| all test | high | 69.2% | 99.4% | 24.0% | 99.3% |
+| all test | likely | 27.0% | 90.9% | 70.3% | 91.6% |
+| all test | uncertain | 3.8% | 54.3% | 5.7% | 48.5% |
+| novel | high | 70.8% | 99.3% | 28.4% | 100.0% |
+| novel | likely | 24.4% | 88.9% | 64.5% | 89.8% |
+| novel | uncertain | 4.8% | 42.9% | 7.1% | 61.5% |
+
+Caveat: the thresholds were read off this same test set (coarse, round
+cut-offs, not fitted). A fresh check needs models outside BioModels' 1,075,
+or a three-way split once there are more.
+
+For the app: High can be offered for one-click acceptance (or bulk
+"accept all high"), Likely shown for a quick check, Uncertain flagged.
 
 Original plan:
 

@@ -16,11 +16,13 @@
 //! No I/O; works in WebAssembly.
 
 mod candidates;
+mod confidence;
 pub mod decode;
 mod model;
 pub mod providers;
 
 pub use candidates::{Candidate, Evidence, Suggestions};
+pub use confidence::{Basis, Confidence, basis, confidence};
 pub use model::{Compartment, Model, Participant, Reaction, Role, Species};
 
 use kpack::Pack;

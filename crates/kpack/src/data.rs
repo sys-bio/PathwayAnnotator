@@ -69,6 +69,10 @@ pub struct Namespace {
     pub pattern: StrId,
     /// Old-style MIRIAM URN prefixes that mean this namespace.
     pub legacy_urns: Vec<StrId>,
+    /// What this namespace's ids start with in identifiers.org form, when
+    /// sources may leave it off: `CHEBI:` (so `15422` is `CHEBI:15422`).
+    /// Empty for most namespaces.
+    pub id_prefix: StrId,
 }
 
 /// An organism, for preferring organism-appropriate candidates.
@@ -309,6 +313,42 @@ impl Pack {
     pub fn find_xref_related(&self, prefix: &str, id: &str) -> Vec<(Target, XrefScope)> {
         match self.namespace_id(prefix) {
             Some(ns) => self.xrefs.lookup(&self.strings, ns, id),
+            None => Vec::new(),
+        }
+    }
+
+    /// The namespace and standard id an annotation URI names, in any form
+    /// models write ([`crate::split_resource`]): identifiers.org paths and
+    /// compact ids, MIRIAM URNs (`urn:miriam:obo.chebi:CHEBI%3A15422`), old
+    /// aliases (`obo.chebi`), ChEBI and KEGG web links. `None` for a
+    /// namespace the pack does not know.
+    pub fn resolve_resource(&self, uri: &str) -> Option<(NsId, String)> {
+        let (written, id) = crate::split_resource(uri)?;
+        let urn = |ns: &Namespace| ns.legacy_urns.iter().map(|u| self.str(*u)).collect::<Vec<_>>();
+        let found = if written.starts_with("urn:miriam:") {
+            self.namespaces.iter().position(|n| urn(n).contains(&written.as_str()))
+        } else {
+            self.namespace_id(&written).map(usize::from).or_else(|| {
+                self.namespaces
+                    .iter()
+                    .position(|n| urn(n).iter().any(|u| u.strip_prefix("urn:miriam:") == Some(written.as_str())))
+            })
+        }?;
+        let ns = &self.namespaces[found];
+        let prefix = self.str(ns.id_prefix);
+        let id = if prefix.is_empty() || id.starts_with(prefix) {
+            id
+        } else {
+            format!("{prefix}{id}")
+        };
+        Some((found as NsId, id))
+    }
+
+    /// Everything an annotation URI is linked to in the pack, with how.
+    /// Empty if the URI is in no known form or names nothing in the pack.
+    pub fn find_resource(&self, uri: &str) -> Vec<(Target, XrefScope)> {
+        match self.resolve_resource(uri) {
+            Some((ns, id)) => self.xrefs.lookup(&self.strings, ns, &id),
             None => Vec::new(),
         }
     }

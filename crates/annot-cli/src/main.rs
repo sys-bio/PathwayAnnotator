@@ -38,6 +38,10 @@ enum Command {
         /// Grade the test set even though the pack has learned its names.
         #[arg(long)]
         allow_leak: bool,
+        /// Also write every graded first suggestion (basis, score, lead,
+        /// right or not) as TSV, for calibrating confidence levels.
+        #[arg(long)]
+        observations: Option<PathBuf>,
     },
 }
 
@@ -51,7 +55,8 @@ fn main() -> ExitCode {
             set,
             out,
             allow_leak,
-        } => run_bench(&pack, &models, &set, &out, allow_leak),
+            observations,
+        } => run_bench(&pack, &models, &set, &out, allow_leak, observations.as_deref()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -68,6 +73,7 @@ fn run_bench(
     set: &str,
     out: &std::path::Path,
     allow_leak: bool,
+    observations: Option<&std::path::Path>,
 ) -> Result<()> {
     let pack = kpack::decode(&std::fs::read(pack_path).map_err(|e| format!("cannot read {}: {e}", pack_path.display()))?)?;
     let held_out = pack
@@ -132,6 +138,24 @@ fn run_bench(
             }
             Err(e) => results.unreadable.push((id.clone(), e)),
         }
+    }
+    if let Some(path) = observations {
+        let mut t = String::from("kind	novel	basis	score	ratio	right	level
+");
+        for o in &results.observations {
+            t.push_str(&format!(
+                "{}	{}	{}	{:.3}	{:.3}	{}	{}
+",
+                if o.reaction { "reaction" } else { "species" },
+                o.novel,
+                format!("{:?}", o.basis).to_lowercase(),
+                o.score,
+                o.ratio,
+                o.right,
+                o.level.label()
+            ));
+        }
+        std::fs::write(path, t)?;
     }
     results.species_misses.sort();
     results.reaction_misses.sort();
