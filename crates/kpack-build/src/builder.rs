@@ -5,11 +5,12 @@ use std::collections::HashMap;
 
 use kpack::{
     CompId, CompartmentDef, Entity, EntityId, Header, NameHit, NameIndex, NameKind, Namespace, NsId, Pack,
-    Reaction, ReactionId, SourceInfo, Sources, StrId, StringTable, Target, Xref, XrefIndex,
+    Reaction, ReactionFlags, ReactionId, SourceInfo, Sources, StrId, StringTable, Target, Xref, XrefIndex,
     XrefKey, XrefScope,
 };
 
 use crate::compartments;
+use crate::labels;
 use crate::namespaces;
 
 /// Adds `x` unless the same id is already there, in which case the sources
@@ -112,7 +113,9 @@ pub fn pick_synonyms(label: &str, names: &[(String, NameHit)]) -> Vec<String> {
     let label_key = kpack::normalize_name(label);
     let mut best: HashMap<String, Choice> = HashMap::new();
     for (name, hit) in names {
-        let name = kpack::strip_charge_suffix(name.trim());
+        // "NADH(2-)" and "NADH dianion" are just NADH.
+        let name = labels::tidy_entity_label(name);
+        let name = name.as_str();
         let key = kpack::normalize_name(name);
         let usable = matches!(hit.kind, NameKind::Preferred | NameKind::Synonym | NameKind::Abbreviation)
             && !key.is_empty()
@@ -392,9 +395,105 @@ impl PackBuilder {
         }
     }
 
+    /// Makes labels readable ([`crate::labels`]): charge states off
+    /// molecule names, SBML escapes out of reaction names.
+    fn tidy_labels(&mut self) {
+        for i in 0..self.entities.len() {
+            let raw = self.strings.get(self.entities[i].label).to_string();
+            let tidy = labels::tidy_entity_label(&raw);
+            if tidy != raw && !tidy.is_empty() {
+                self.entities[i].label = self.strings.intern(&tidy);
+            }
+        }
+        for i in 0..self.reactions.len() {
+            let raw = self.strings.get(self.reactions[i].label).to_string();
+            let tidy = labels::tidy_reaction_label(&raw);
+            if tidy != raw && !tidy.is_empty() {
+                self.reactions[i].label = self.strings.intern(&tidy);
+            }
+        }
+    }
+
+    /// Gives reactions labelled only by an id ("PGKf") a name: their most
+    /// familiar synonym; else the name of a reaction that is the same
+    /// chemistry (shares a Rhea, MetaNetX, MetaCyc, KEGG or SEED reaction
+    /// id: PGKf and PGK are both "phosphoglycerate kinase"); else what it
+    /// does ("fumarate transport"). Runs after the synonyms are picked; a
+    /// synonym that becomes the label leaves the synonym list.
+    fn name_id_only_reactions(&mut self) {
+        let specific: Vec<NsId> = ["rhea", "metanetx.reaction", "metacyc.reaction", "kegg.reaction", "seed.reaction"]
+            .iter()
+            .map(|p| self.ns(p))
+            .collect();
+        let named: Vec<bool> = self
+            .reactions
+            .iter()
+            .map(|r| !labels::looks_like_id(self.strings.get(r.label)))
+            .collect();
+        // Named reactions by the specific ids they carry.
+        let mut by_id: HashMap<(NsId, StrId), Vec<usize>> = HashMap::new();
+        for (i, r) in self.reactions.iter().enumerate().filter(|(i, _)| named[*i]) {
+            for x in r.xrefs.iter().filter(|x| x.scope == XrefScope::Exact && specific.contains(&x.ns)) {
+                by_id.entry((x.ns, x.id)).or_default().push(i);
+            }
+        }
+        for i in 0..self.reactions.len() {
+            let label = self.strings.get(self.reactions[i].label).to_string();
+            if !labels::looks_like_id(&label) {
+                continue;
+            }
+            let synonym = self.reactions[i]
+                .synonyms
+                .iter()
+                .position(|&s| {
+                    let s = self.strings.get(s);
+                    !labels::looks_like_id(s) && s.chars().any(|c| c.is_lowercase())
+                });
+            if let Some(k) = synonym {
+                let s = self.reactions[i].synonyms.remove(k);
+                self.reactions[i].label = s;
+                continue;
+            }
+            // The named reaction sharing the most ids; the shorter name on
+            // a tie ("phosphoglycerate kinase").
+            let mut shared: HashMap<usize, usize> = HashMap::new();
+            for x in self.reactions[i].xrefs.iter().filter(|x| x.scope == XrefScope::Exact) {
+                for &j in by_id.get(&(x.ns, x.id)).into_iter().flatten() {
+                    *shared.entry(j).or_default() += 1;
+                }
+            }
+            let twin = shared.into_iter().max_by(|a, b| {
+                let len = |j: usize| self.strings.get(self.reactions[j].label).len();
+                a.1.cmp(&b.1).then(len(b.0).cmp(&len(a.0))).then(b.0.cmp(&a.0))
+            });
+            // A transport or exchange is better described by what it moves
+            // than by a twin's name, which may be for another compartment.
+            let moves = {
+                let f = self.reactions[i].flags;
+                f.contains(ReactionFlags::TRANSPORT) || f.contains(ReactionFlags::EXCHANGE)
+            };
+            if let Some((j, _)) = twin.filter(|_| !moves) {
+                let name = self.strings.get(self.reactions[j].label).to_string();
+                let name = labels::without_compartment(&name).to_string();
+                self.reactions[i].label = self.strings.intern(&name);
+                continue;
+            }
+            let strings = &self.strings;
+            let entities = &self.entities;
+            let derived = labels::reaction_label_from_participants(&self.reactions[i], entities, |e| {
+                strings.get(entities[e as usize].label).to_string()
+            });
+            if let Some(d) = derived {
+                self.reactions[i].label = self.strings.intern(&d);
+            }
+        }
+    }
+
     /// Indexes everything into a pack.
     pub fn finish(mut self, built: String) -> Pack {
+        self.tidy_labels();
         self.fill_synonyms();
+        self.name_id_only_reactions();
         let names = NameIndex::build(std::mem::take(&mut self.entity_names), |s| {
             self.strings.intern(s)
         });

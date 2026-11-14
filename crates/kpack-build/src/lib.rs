@@ -10,6 +10,7 @@ pub mod builder;
 pub mod compartments;
 pub mod date;
 pub mod fetch;
+pub mod labels;
 pub mod namespaces;
 pub mod sources;
 

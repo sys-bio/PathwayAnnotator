@@ -65,7 +65,7 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000340 | VKO | VKO | phylloquinone (phllqne) / menaquinone-9 (mqn9) / menadione (mndn) / menaquinone-8 (mqn8) / menaquinone-7 (mqn7) | - | - |
 | BIOMD0000000340 | VK_p | VK_p | phylloquinone (phllqne) / menaquinone-9 (mqn9) / menadione (mndn) / menaquinone-8 (mqn8) / menaquinone-7 (mqn7) | - | - |
 | BIOMD0000000410 | _96 | Rec_active | peroxynitrite (CE5643) / superoxide (o2s) / hypochlorous acid (CE4633) / hydrogen peroxide (h2o2) | - | - |
-| BIOMD0000000470 | s_1435 | phosphatidylethanolamine (dihexadec-9enoyl, n-C16:1) | 1,2-distearoylphosphatidylethanolamine zwitterion (pe180) / PE(18:1(11Z)/18:1(9Z)) (pe18111Z1819Z) / 1,2-dihexadecanoyl-sn-glycero-3-phosphoethanolamine zwitterion (pe160) | - | - |
+| BIOMD0000000470 | s_1435 | phosphatidylethanolamine (dihexadec-9enoyl, n-C16:1) | 1,2-distearoylphosphatidylethanolamine (pe180) / PE(18:1(11Z)/18:1(9Z)) (pe18111Z1819Z) / 1,2-dihexadecanoyl-sn-glycero-3-phosphoethanolamine (pe160) | - | - |
 | BIOMD0000000490 | Hn_aw | Hn_aw | histaminium (hista) | - | - |
 | BIOMD0000000490 | Hn_b | Hn_b | histaminium (hista) | - | - |
 | BIOMD0000000495 | mw08818dfe_fb12_45cc_8c1d_d965f142d0ce | EtnE | ethanolaminium (etha) | - | - |
@@ -79,7 +79,7 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000590 | dho | dho | (S)-dihydroorotate (dhor__S) | - | - |
 | BIOMD0000000725 | AHMDHP | AHMDHP | 2-amino-6-(hydroxymethyl)-7,8-dihydropteridin-4-ol (2ahhmp) | - | - |
 | BIOMD0000000725 | DHNTP | DHNTP | 7,8-dihydroneopterin 3'-triphosphate (ahdt) | - | - |
-| BIOMD0000000725 | Gln | Gln | L-glutamine zwitterion (gln__L) | - | - |
+| BIOMD0000000725 | Gln | Gln | L-glutamine (gln__L) | - | - |
 | BIOMD0000000725 | HAD | HAD | (Z)-1,2-ethenediol (gcald) | - | - |
 | BIOMD0000000725 | PTHP | PTHP | dyspropterin (6pthp) / (R)-dyspropterin (6pthp__R) | - | - |
 | BIOMD0000000725 | SK | SK | shikimate (skm) | - | - |
@@ -104,7 +104,7 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000050 | AA |  | acetate (ac) | arachidonate (arachd) | likely |
 | BIOMD0000000050 | FA |  | formate (for) | fumarate (fum) | likely |
 | BIOMD0000000050 | MG |  | methylglyoxal (mthgxl) | magnesium (mg2) | uncertain |
-| BIOMD0000000065 | L | lactose_internal | lactose (lcts) | L-leucine zwitterion (leu__L) | uncertain |
+| BIOMD0000000065 | L | lactose_internal | lactose (lcts) | L-leucine (leu__L) | uncertain |
 | BIOMD0000000070 | Lac | Lactate | (R)-lactate (lac__D) | (S)-lactate (lac__L) | likely |
 | BIOMD0000000075 | DAG_PM | DAG_PM | 1,2-dilauroyl-sn-glycerol (12dgr120) / 1,2 ditetradecanoylglycerol (12dgr140) / 1,2-dioctadecanoyl-sn-glycerol (12dgr180) / 1,2-di-[(11Z)-octadecenoyl]glycerol (12dgr181) | water (h2o) | uncertain |
 | BIOMD0000000085 | species_3 | T | GTP (gtp) | thymidine (thymd) | likely |
@@ -117,8 +117,8 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000470 | s_0446 | alpha-D-Ribose 5-phosphate | D-ribofuranose 5-phosphate (r5p) | alpha-D-ribofuranose 5-phosphate (ar5p) | likely |
 | BIOMD0000000470 | s_0654 | D-Glucosamine 6-phosphate | alpha-D-glucosamine 6-phosphate (gam6p) | 2-ammonio-2-deoxy-D-glucopyranose 6-phosphate (gam6p_any) | likely |
 | BIOMD0000000470 | s_0979 | Hexadecenoyl-CoA (n-C16:1CoA) | (E)-hexadec-2-enoyl-CoA (hdd2coa) | palmitoleoyl-CoA (hdcoa) | likely |
-| BIOMD0000000495 | mw73259e20_240e_4f3a_b2e0_9ca248658898 | SerE | D-serine zwitterion (ser__D) / L-serine zwitterion (ser__L) | O-acetyl-L-serine zwitterion (acser) | uncertain |
-| BIOMD0000000495 | mwf166ad55_4ff0_49fb_95d2_b657ad7653d5 | PE | 1,2-distearoylphosphatidylethanolamine zwitterion (pe180) / PE(18:1(11Z)/18:1(9Z)) (pe18111Z1819Z) / 1,2-dihexadecanoyl-sn-glycero-3-phosphoethanolamine zwitterion (pe160) | O-phosphonatoethanaminium (ethamp) | likely |
+| BIOMD0000000495 | mw73259e20_240e_4f3a_b2e0_9ca248658898 | SerE | D-serine (ser__D) / L-serine (ser__L) | O-acetyl-L-serine (acser) | uncertain |
+| BIOMD0000000495 | mwf166ad55_4ff0_49fb_95d2_b657ad7653d5 | PE | 1,2-distearoylphosphatidylethanolamine (pe180) / PE(18:1(11Z)/18:1(9Z)) (pe18111Z1819Z) / 1,2-dihexadecanoyl-sn-glycero-3-phosphoethanolamine (pe160) | O-phosphonatoethanaminium (ethamp) | likely |
 | BIOMD0000000510 | Rib_g | Rib_g | D-ribofuranose (rib__D) | 2-deoxy-D-ribofuranose (drib) | uncertain |
 | BIOMD0000000515 | Rib5P_g | Rib5P_g | D-ribofuranose (rib__D) | aldehydo-D-arabinose 5-phosphate (ara5p) | uncertain |
 | BIOMD0000000560 | ROS |  | peroxynitrite (CE5643) / superoxide (o2s) / hypochlorous acid (CE4633) / hydrogen peroxide (h2o2) | 2-oxoglutarate (akg) | uncertain |
@@ -132,7 +132,7 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000725 | Formyl | Formyl | formate (for) | water (h2o) | uncertain |
 | BIOMD0000000725 | fTHFGlu | fTHFGlu | 10-formyltetrahydrofolate (10fthf_any) / (6R)-10-formyltetrahydrofolate (10fthf) | L-glutamate (glu__L) | uncertain |
 | BIOMD0000000750 | Na | Na | acetylcholine (ach) | sodium (na1) | high |
-| BIOMD0000000805 | Le | Le | (R)-lactate (lac__D) / (S)-lactate (lac__L) | 3-iodo-L-tyrosine zwitterion (3ityr__L) | uncertain |
+| BIOMD0000000805 | Le | Le | (R)-lactate (lac__D) / (S)-lactate (lac__L) | 3-iodo-L-tyrosine (3ityr__L) | uncertain |
 | BIOMD0000000805 | Li | Li | (R)-lactate (lac__D) / (S)-lactate (lac__L) | 3,5-diiodo-L-tyrosinate (35diotyr) | uncertain |
 | BIOMD0000000890 | c | c | cholesterol (chsterol) | calcium (ca2) | likely |
 | BIOMD0000001055 | Fructose_6_Phosphate | Fructose-6-Phosphate | D-fructofuranose 6-phosphate (f6p_any) | beta-D-fructofuranose 6-phosphate (f6p) | high |
@@ -157,8 +157,8 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000575 | O2 | O2- | superoxide (o2s) | dioxygen (o2) (right one at 2) | likely |
 | BIOMD0000000725 | AHMDPP | AHMDPP | (2-amino-4-hydroxy-7,8-dihydropteridin-6-yl)methyl diphosphate (2ahhmd) | 2-amino-6-(hydroxymethyl)-7,8-dihydropteridin-4-ol (2ahhmp) (right one at 2) | uncertain |
 | BIOMD0000000725 | DHSK | DHSK | 3-dehydroshikimate (3dhsk) | 7-phospho-2-dehydro-3-deoxy-D-arabino-heptonate (2dda7p) (right one at 2) | uncertain |
-| BIOMD0000000050 | Gly |  | glycine zwitterion (gly) | glycerol (glyc) (right one at 3) | likely |
-| BIOMD0000000725 | Gly | Gly | glycine zwitterion (gly) | glycerol (glyc) (right one at 3) | likely |
+| BIOMD0000000050 | Gly |  | glycine (gly) | glycerol (glyc) (right one at 3) | likely |
+| BIOMD0000000725 | Gly | Gly | glycine (gly) | glycerol (glyc) (right one at 3) | likely |
 | BIOMD0000001005 | NAM | NAM | nicotinamide (ncam) | nicotinate D-ribonucleotide (nicrnt) (right one at 4) | uncertain |
 | BIOMD0000000495 | mw8796c919_9251_4970_8f87_0bca9ecfeb5c | Etn | ethanolaminium (etha) | sphinganine 1-phosphate (sph1p) (right one at 5) | uncertain |
 | BIOMD0000000505 | NADHMAT |  | NADH (nadh) | acetoacetate (acac) (right one at 5) | likely |
@@ -172,7 +172,7 @@ How often the first suggestion was right, by the engine's own          confidenc
 
 | Model | Id | Name | Annotated as | First suggestion | Level |
 |---|---|---|---|---|---|
-| BIOMD0000000015 | dgnuc |  | 5'-nucleotidase (dGMP) (NTD8) / 5'-nucleotidase (dGMP) (NTD8pp) / _5'-nucleotidase (dGMP), lysosomal (NTD8l) | - | - |
+| BIOMD0000000015 | dgnuc |  | 5'-nucleotidase (dGMP) (NTD8) / 5'-nucleotidase (dGMP) (NTD8pp) / 5'-nucleotidase (dGMP), lysosomal (NTD8l) | - | - |
 | BIOMD0000000015 | mat |  | methionine adenosyltransferase (METAT) | - | - |
 | BIOMD0000000070 | vATPase | ATPase | ATP maintenance requirement (ATPM) / Non-growth associated ATP maintenance (ATPPHm) | - | - |
 | BIOMD0000000070 | vRibPiso | Ribose phosphate isomerase | ribose-5-phosphate isomerase (RPI) / Ribose-5-phosphate isomerase (RPIh) | - | - |
@@ -186,9 +186,9 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000145 | R3 |  | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | - | - |
 | BIOMD0000000165 | Gs_gtp_hydrolysis | Gs_gtp_hydrolysis | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | - | - |
 | BIOMD0000000190 | SAMdc | S-adenosylmethionine decarboxylase | adenosylmethionine decarboxylase (ADMDC) | - | - |
-| BIOMD0000000320 | AADC_clearance | L-Dopa clearance via AADC  | _3-Hydroxy-L-tyrosine carboxy-lyase (3HLYTCL) / L-Tryptophan decarboxy-lyase (LTDCL) | - | - |
-| BIOMD0000000450 | VcMTCH | VcMTCH | methenyltetrahydrofolate cyclohydrolase (MTHFC_1) / R_methenyltetrahydrifikate_cyclohydrolase__mitochondrial (MTHFCm) / 5,10-Methenyltetrahydrofolate 5-hydrolase (decyclizing) (MTHFCx) | - | - |
-| BIOMD0000000590 | r1 | r1 | HCGALm (HCGALm) / hydrogen-carbonate:L-glutamine amido-ligase (ADP-forming, carbamate-phosphorylating) (CBPSn) / carbamoyl-phosphate synthase (glutamine-hydrolysing) (CBPS) | - | - |
+| BIOMD0000000320 | AADC_clearance | L-Dopa clearance via AADC  | 3-Hydroxy-L-tyrosine carboxy-lyase (3HLYTCL) / L-Tryptophan decarboxy-lyase (LTDCL) | - | - |
+| BIOMD0000000450 | VcMTCH | VcMTCH | methenyltetrahydrofolate cyclohydrolase (MTHFC_1) / methenyltetrahydrifikate cyclohydrolase (mitochondrial) (MTHFCm) / 5,10-Methenyltetrahydrofolate 5-hydrolase (decyclizing) (MTHFCx) | - | - |
+| BIOMD0000000590 | r1 | r1 | carbamoyl-phosphate synthase (glutamine-hydrolysing) (HCGALm) / hydrogen-carbonate:L-glutamine amido-ligase (ADP-forming, carbamate-phosphorylating) (CBPSn) / carbamoyl-phosphate synthase (glutamine-hydrolysing) (CBPS) | - | - |
 | BIOMD0000000590 | r2 | r2 | carbamoyl-phosphate:L-aspartate carbamoyltransferase (ASPCTn) / aspartate carbamoyltransferase (ASPCT_1) / carbamoyl-phosphate:L-aspartate carbamoyltransferase (ASPCTm) | - | - |
 | BIOMD0000000590 | r3 | r3 | (S)-dihydroorotate amidohydrolase (DHORTSn) / (S)-dihydroorotate amidohydrolase (DHR) / dihydroorotase (DHORTS) | - | - |
 | BIOMD0000000605 | v2 | v2 | hexokinase (D-glucose:ATP) (HEX1) | - | - |
@@ -197,25 +197,25 @@ How often the first suggestion was right, by the engine's own          confidenc
 
 | Model | Id | Name | Annotated as | First suggestion | Level |
 |---|---|---|---|---|---|
-| BIOMD0000000015 | ampd |  | AMP aminohydrolase (AMPDg) / R_Adenosine_monophosphate_deaminase (AMPDA) | insosine kinase (INSK) | uncertain |
-| BIOMD0000000015 | gmps |  | GMPS_glu_m (GMPS_glu_m) / GMP synthase (GMPS2) | GMP synthase (GMPS) | likely |
-| BIOMD0000000015 | gnuc |  | 5'-nucleotidase (GMP) (NTD9) / 5'-nucleotidase (GMP) (NTD9pp) / _5'-nucleotidase (GMP), extracellular (NTD9e) / _5'-nucleotidase (GMP), lysosome (NTD9l) | guanine phosphoribosyltransferase (GUAPRT) | uncertain |
+| BIOMD0000000015 | ampd |  | AMP aminohydrolase (AMPDg) / Adenosine monophosphate deaminase (AMPDA) | insosine kinase (INSK) | uncertain |
+| BIOMD0000000015 | gmps |  | GMP synthase (GMPS_glu_m) / GMP synthase (GMPS2) | GMP synthase (GMPS) | likely |
+| BIOMD0000000015 | gnuc |  | 5'-nucleotidase (GMP) (NTD9) / 5'-nucleotidase (GMP) (NTD9pp) / 5'-nucleotidase (GMP), extracellular (NTD9e) / 5'-nucleotidase (GMP), lysosome (NTD9l) | guanine phosphoribosyltransferase (GUAPRT) | uncertain |
 | BIOMD0000000015 | inuc |  | 5'-nucleotidase (IMP) (NTD11) / 5'-nucleotidase (IMP) (NTD11pp) | hypoxanthine phosphoribosyltransferase (Hypoxanthine) (HXPRT) | likely |
-| BIOMD0000000070 | vGSHox | Glutathione oxidation | glutathioneoxidoreductase(apicoplast) (GDR_nadp_h) / glutathione oxidoreductase (GTHOr) / R_glutathione_oxidoreductase (GTHOm) | R_glutathione_peroxidase (GTHPe) | likely |
+| BIOMD0000000070 | vGSHox | Glutathione oxidation | glutathioneoxidoreductase(apicoplast) (GDR_nadp_h) / glutathione oxidoreductase (GTHOr) / glutathione oxidoreductase (GTHOm) | glutathione peroxidase (GTHPe) | likely |
 | BIOMD0000000080 | Reaction_6 | Hydrolysis of GTP to GDP | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | phytoene synthase (PSY) | uncertain |
 | BIOMD0000000085 | reaction_20 | RG*AT hydrolysis | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | aspartase racemase (ASPR) | uncertain |
-| BIOMD0000000085 | reaction_3 | G*T  hydrolysis | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | Conversion of CHEBI:15903 to CHEBI:4167, because one is an instance of the other. (GALM1) | uncertain |
-| BIOMD0000000450 | V_CTGL | V_CTGL | gamma-glutamylcysteine synthetase (GLUCYS) / gamma-Glutamylcysteine synthase (GCL) | CYSPH-RXN.c (CYSTS_1) | likely |
-| BIOMD0000000450 | V_MTHFR | V_MTHFR | methylenetetrahydrofolate dehydrogenase (NADP) (MTHFD) / R_methylenetetrahydrofolate_dehydrogenase__NADP___mitochondrial (MTHFDm) | MTHFR (MTHFR) | likely |
+| BIOMD0000000085 | reaction_3 | G*T  hydrolysis | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | Conversion of CHEBI:15903 to CHEBI:4167, because one is an instance of the other (GALM1) | uncertain |
+| BIOMD0000000450 | V_CTGL | V_CTGL | gamma-glutamylcysteine synthetase (GLUCYS) / gamma-Glutamylcysteine synthase (GCL) | L-cysteine + O-phosphonato-L-homoserine = L-cystathionine (CYSTS_1) | likely |
+| BIOMD0000000450 | V_MTHFR | V_MTHFR | methylenetetrahydrofolate dehydrogenase (NADP) (MTHFD) / methylenetetrahydrofolate dehydrogenase (NADP) mitochondrial (MTHFDm) | (6R)-5,10-methylenetetrahydrofolate = (6S)-5-methyltetrahydrofolate (MTHFR) | likely |
 | BIOMD0000000470 | r_0664 | glucose-6-phosphate isomerase | alpha-D-Glucose 6-phosphate ketol-isomerase (PGI1) / alpha-D-Glucose 6-phosphate ketol-isomerase (PGI1c) | glucose-6-phosphate isomerase (PGI) | likely |
 | BIOMD0000000470 | r_1962 | NAD(P) transhydrogenase (periplasm) | NAD transhydrogenase (NADTRHD) / NADPH:NAD+ oxidoreductase (NNOR) | NAD(P) transhydrogenase (periplasm) (THD2pp) | high |
 | BIOMD0000000590 | r5 | r5 | orotate phosphoribosyltransferase (ORPT) | UMP kinase (UTP) (UMPK3) | uncertain |
 | BIOMD0000000590 | r6 | r6 | orotidine-5'-phosphate decarboxylase (OMPDC) | UMP kinase (UTP) (UMPK3) | likely |
 | BIOMD0000000590 | r7 | r7 | nucleoside-diphosphate kinase (ATP:UDP) (NDPK2) / nucleoside-diphosphate kinase (ATP:UDP), mitochondrial (NDPK2m) / nucleoside-diphosphate kinase (ATP:UDP), nuclear (NDPK2n) | UMP kinase (UTP) (UMPK3) | likely |
 | BIOMD0000000605 | v6 | v6 | glycerol-3-phosphatase (G3PT) | Glycerol dehydrogenase (GLYCDx) | likely |
-| BIOMD0000000690 | FolP | FolP | dihydropteroate synthase (DHPS2_1) / R_dihydropteroate_synthase__mitochondrial (FOLD3m) | R_dihydropteroate_synthase (DHPS) | likely |
-| BIOMD0000000725 | R24 | R24 - 10-Formyltetrahydrofolate synthetase | R_formate_tetrahydrofolate_ligase__mitochondrial_irreversible (FTHFLmi) / formate-tetrahydrofolate ligase (FTHFLi) | THFGLUH (THFGLUH) | uncertain |
-| BIOMD0000000725 | R26 | R26 - 10-Formyltetrahydrofolate dehydrogenase | formyltetrahydrofolate dehydrogenase (FTHFDH) | THFGLUH (THFGLUH) | uncertain |
+| BIOMD0000000690 | FolP | FolP | dihydropteroate synthase (DHPS2_1) / dihydropteroate synthase (mitochondrial) (FOLD3m) | dihydropteroate synthase (DHPS) | likely |
+| BIOMD0000000725 | R24 | R24 - 10-Formyltetrahydrofolate synthetase | formate tetrahydrofolate ligase (mitochondrial irreversible) (FTHFLmi) / formate-tetrahydrofolate ligase (FTHFLi) | 5,6,7,8-tetrahydrofolyl-L-glutamic acid = L-glutamate + (6S)-5,6,7,8-tetrahydrofolate (THFGLUH) | uncertain |
+| BIOMD0000000725 | R26 | R26 - 10-Formyltetrahydrofolate dehydrogenase | formyltetrahydrofolate dehydrogenase (FTHFDH) | 5,6,7,8-tetrahydrofolyl-L-glutamic acid = L-glutamate + (6S)-5,6,7,8-tetrahydrofolate (THFGLUH) | uncertain |
 | BIOMD0000001090 | R_LCTO_cytop | (S)-lactate+oxygen=>pyruvate+hydrogenperoxide | (S)-lactate:oxygen 2-oxidoreductase (decarboxylating) (LO) | L-lactate dehydrogenase (LDH_L) | likely |
 
 ### Right answer ranked lower (first 17 of 17)
@@ -223,18 +223,18 @@ How often the first suggestion was right, by the engine's own          confidenc
 | Model | Id | Name | Annotated as | First suggestion | Level |
 |---|---|---|---|---|---|
 | BIOMD0000000070 | vLDHNADPH | Lactate dehydrogenase | L-lactate dehydrogenase (LDH_L) / L-lactate dehydrogenase (LDH_Lm) / (S)-Lactate:NAD+ oxidoreductase (LLDHh) | lactate dehydrogenase (LDHm) (right one at 2) | likely |
-| BIOMD0000000245 | r3 | Pyruvate Dehydrogenase | pyruvate dehydrogenase(apicoplast) (PDHapi) / pyruvate dehydrogenase (PDH) / R_pyruvate_dehydrogenase (PDHm) | R_pyruvate_decarboxylase (PYRDC) (right one at 2) | likely |
-| BIOMD0000000470 | r_0697 | glycerate kinase | GLYPT (GLYPT) / glycerate kinase (GLYCK) | glycerate kinase (GLYCK2) (right one at 2) | likely |
-| BIOMD0000000635 | revreaction_38 | revreaction_38 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 2) | uncertain |
-| BIOMD0000000635 | revreaction_39 | revreaction_39 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 2) | uncertain |
-| BIOMD0000000635 | revreaction_40 | revreaction_40 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 2) | uncertain |
-| BIOMD0000000635 | revreaction_41 | revreaction_41 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / _3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | ADECn (ADECn) (right one at 2) | uncertain |
+| BIOMD0000000245 | r3 | Pyruvate Dehydrogenase | pyruvate dehydrogenase(apicoplast) (PDHapi) / pyruvate dehydrogenase (PDH) / pyruvate dehydrogenase (PDHm) | pyruvate decarboxylase (PYRDC) (right one at 2) | likely |
+| BIOMD0000000470 | r_0697 | glycerate kinase | glycerate kinase (GLYPT) / glycerate kinase (GLYCK) | glycerate kinase (GLYCK2) (right one at 2) | likely |
+| BIOMD0000000635 | revreaction_38 | revreaction_38 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / 3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | adenylate cyclase (ADECn) (right one at 2) | uncertain |
+| BIOMD0000000635 | revreaction_39 | revreaction_39 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / 3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | adenylate cyclase (ADECn) (right one at 2) | uncertain |
+| BIOMD0000000635 | revreaction_40 | revreaction_40 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / 3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | adenylate cyclase (ADECn) (right one at 2) | uncertain |
+| BIOMD0000000635 | revreaction_41 | revreaction_41 | 3',5'-cyclic-nucleotide phosphodiesterase (PDE1) / 3',5'-cyclic-nucleotide phosphodiesterase,Golgi (PDE1g) / adenosine 3',5'-phosphate 5'-nucleotidohydrolase (APNn) | adenylate cyclase (ADECn) (right one at 2) | uncertain |
 | BIOMD0000001090 | R_R04198_C3_cytop | (2S,4S)-4-Hydroxy-2,3,4,5-tetrahydrodipicolinate+NADH+H+=>2,3,4,5-Tetrahydrodipicolinate+NAD++H2O | Dihydrodipicolinate reductase (NADH) reversible (DHDPRx_r) | 4-hydroxy-tetrahydrodipicolinate reductase (H4THDPR) (right one at 2) | likely |
-| BIOMD0000000225 | vpfk | vpfk | PFKg (PFKg) / phosphofructokinase (PFK) | fructose-bisphosphatase (FBP) (right one at 3) | likely |
+| BIOMD0000000225 | vpfk | vpfk | phosphofructokinase (PFKg) / phosphofructokinase (PFK) | fructose-bisphosphatase (FBP) (right one at 3) | likely |
 | BIOMD0000000470 | r_0761 | hexokinase (D-fructose:ATP) | hexokinase (D-glucose:ATP) (HEX1) | hexokinase (D-fructose:ATP) (HEX7) (right one at 3) | likely |
-| BIOMD0000000470 | r_0925 | malate dehydrogenase | malate dehydrogenase (MDHi2) / R_malate_dehydrogenase__mitochondrial (MDHm) / R_malate_dehydrogenase__peroxisomal (MDHp) / (S)-malate:NAD+ oxidoreductase (MDHf) / (S)-malate:NAD+ oxidoreductase (MDHh) | Malate dehydrogenase (ubiquinone 8 as acceptor) (MDH2) (right one at 3) | likely |
+| BIOMD0000000470 | r_0925 | malate dehydrogenase | malate dehydrogenase (MDHi2) / malate dehydrogenase (mitochondrial) (MDHm) / malate dehydrogenase (peroxisomal) (MDHp) / (S)-malate:NAD+ oxidoreductase (MDHf) / (S)-malate:NAD+ oxidoreductase (MDHh) | Malate dehydrogenase (ubiquinone 8 as acceptor) (MDH2) (right one at 3) | likely |
 | BIOMD0000000470 | r_1230 | protoporphyrinogen oxidase (aerobic) | Protoporphyrinogen oxidase (aerobic) (PPPGO2_1) / protoporphyrinogen IX oxidase (PPPGO_1) | protoporphyrinogen oxidase (aerobic) (PPPGO) (right one at 3) | likely |
-| BIOMD0000000590 | r8 | r8 | CTPS2n (CTPS2n) / CTP synthase (glutamine) (CTPS2) | dCTP deaminase (DCTPD2_1) (right one at 3) | likely |
+| BIOMD0000000590 | r8 | r8 | CTP synthase (glutamine) (CTPS2n) / CTP synthase (glutamine) (CTPS2) | dCTP deaminase (DCTPD2_1) (right one at 3) | likely |
 | BIOMD0000000725 | R6 | R6 - Phosphoenolpyruvate:3-phosphoshikimate 5-O-(1-carboxyvinyl)-transferase | 3-phosphoshikimate 1-carboxyvinyltransferase (PSCVT) / enolpyruvylshikimate phosphate synthase (PSCIT) | UDP-N-acetylglucosamine 1-carboxyvinyltransferase (UAGCVT_1) (right one at 3) | likely |
 | BIOMD0000001055 | R11 | R11 | pyruvate carboxylase (PC) / pyruvate carboxylase (PCm) | oxaloacetate decarboxylase (OAADC) (right one at 3) | likely |
 | BIOMD0000000015 | pyr |  | orotate phosphoribosyltransferase (ORPT) | adenine phosphoribosyltransferase (ADPT2) (right one at 4) | uncertain |

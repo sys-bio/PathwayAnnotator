@@ -640,8 +640,22 @@ Renaming SBML ids (2026-11-14), `annot_model::Workspace::rename`:
 Known issues / next (in order):
 - Done (2026-11-14): "Accept all" is now one undo step (`Workspace::batch`
   groups edits into one `Change::Group`).
-- Some BiGG labels are poor ("R_glucose_transport__uniport_", "PGKf");
-  prefer a ChEBI/Rhea name or a cleaned label for display.
+- Done (2026-11-14): readable labels (`kpack-build/src/labels.rs`, run in
+  `PackBuilder::finish`). Molecules lose charge states ("L-leucine
+  zwitterion" -> "L-leucine", 145 labels). Reactions: SBML escapes undone
+  ("R_glucose_transport__uniport_" -> "glucose transport (uniport)"),
+  stray "_" and final "." dropped, charges off "Exchange of X(2-)."
+  (about 2,000 labels). The 563 labelled only by an id take a synonym, else
+  the name of a reaction with the same chemistry (shared Rhea, MetaNetX,
+  MetaCyc, KEGG or SEED id; compartment qualifier dropped; PGKf ->
+  "phosphoglycerate kinase", 99 labels), else what they do ("fumarate
+  transport", "Exchange of X", "A + B = C"; transports and exchanges
+  always this way). Synonyms that are only a charge state ("NADH
+  dianion") are no longer offered. Only labels change; names the matcher
+  looks up are as the sources gave them, and the benchmark is unchanged.
+- Some molecule labels are chemists' names for the charged form
+  ("3-phosphonato-D-glycerate", "hydrogenphosphate"); the familiar name is
+  shown as a synonym. Preferring a familiar label is a possible next step.
 - A molecule card opened near the bottom of the page needed extra space
   below the list (now padded); a card that opens upward when there is no
   room below would be better.
