@@ -78,13 +78,18 @@ trunk serve --open
 
 ## Publishing
 
-Every push to `main` runs `.github/workflows/pages.yml`: it downloads the
-source data (only when its cache is empty, so each deploy uses the same
-data), builds the knowledge pack and the app for the `/PathwayAnnotator/`
-path, and deploys them to GitHub Pages. To start using newer source data,
-change `SOURCES_CACHE` in the workflow. The first time, set the
-repository's Settings > Pages > Build and deployment > Source to "GitHub
-Actions".
+Every push to `main` runs `.github/workflows/pages.yml`: it builds the
+knowledge pack from `data/snapshot` and the app for the
+`/PathwayAnnotator/` path, and deploys them to GitHub Pages. The build
+downloads nothing: `data/snapshot` (42 MB) holds BiGG, ChEBI (pinned to
+release 257, `RELEASE` in `crates/kpack-build/src/sources/chebi.rs`) and a
+digest of the curated BioModels models (their species' and reactions' names
+and annotations, all the pack takes from them; BioModels refuses downloads
+from GitHub's build machines). Every deploy uses the same data until the
+snapshot is refreshed; `data/snapshot/README.md` says how, with the data
+licenses. `kpack-build build` uses the digest whenever no downloaded
+BioModels models are in its cache. The first time, set the repository's
+Settings > Pages > Build and deployment > Source to "GitHub Actions".
 
 ## Data and licenses
 

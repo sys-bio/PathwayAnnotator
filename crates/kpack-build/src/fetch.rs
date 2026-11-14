@@ -43,12 +43,37 @@ pub fn fetch_bigg(cache: &Path) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Downloads ChEBI's flat files into `<cache>/chebi`.
+/// Downloads ChEBI's flat files for release [`chebi::RELEASE`] into
+/// `<cache>/chebi`: from EBI's archive once that release has been
+/// archived, else from the current files, which must then be that release
+/// (checked in their README before anything else is downloaded).
 pub fn fetch_chebi(cache: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let dir = cache.join("chebi");
     std::fs::create_dir_all(&dir)?;
-    for file in chebi::FILES {
-        let url = format!("{}{file}", chebi::BASE_URL);
+    let readme = dir.join(chebi::README_FILE);
+    let archive = chebi::archive_url(chebi::RELEASE);
+    let base = match download(&format!("{archive}{}", chebi::README_FILE), &readme) {
+        Ok(_) => {
+            eprintln!("ChEBI release {} from the archive", chebi::RELEASE);
+            archive
+        }
+        Err(_) => {
+            download(&format!("{}{}", chebi::BASE_URL, chebi::README_FILE), &readme)?;
+            chebi::BASE_URL.to_string()
+        }
+    };
+    let release = chebi::release_from_readme(&std::fs::read_to_string(&readme)?);
+    if release.as_deref() != Some(chebi::RELEASE) {
+        return Err(format!(
+            "ChEBI's current files are release {}, but packs are built from release {}, which is not in \
+             EBI's archive yet; change chebi::RELEASE to use the newer release",
+            release.as_deref().unwrap_or("unknown"),
+            chebi::RELEASE
+        )
+        .into());
+    }
+    for file in chebi::FILES.iter().filter(|f| **f != chebi::README_FILE) {
+        let url = format!("{base}{file}");
         eprintln!("fetching {url}");
         let n = download(&url, &dir.join(file))?;
         eprintln!("  {file}: {n} bytes");

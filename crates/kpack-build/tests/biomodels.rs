@@ -127,3 +127,27 @@ fn the_pack_reads_annotation_uris_itself() {
     }
     assert!(p.find_resource("http://identifiers.org/uniprot/P12345").is_empty());
 }
+
+#[test]
+fn a_digest_builds_the_same_pack_as_the_models() {
+    // The digest stands in for the models where BioModels cannot be
+    // reached (GitHub's build machines). Written to the system's temporary
+    // folder and removed afterwards.
+    let digest = std::env::temp_dir().join(format!("kpack-biomodels-digest-{}.json.gz", std::process::id()));
+    assert_eq!(biomodels::write_digest(&fixtures().join("biomodels"), &digest).unwrap(), 3);
+    for exclude_test in [false, true] {
+        let (from_models_pack, from_models_stats) = build(exclude_test);
+        let mut b = PackBuilder::new();
+        bigg::load(&mut b, &fixtures().join("bigg"), "test").unwrap();
+        chebi::load(&mut b, &fixtures().join("chebi")).unwrap();
+        let stats = biomodels::load_digest(&mut b, &digest, exclude_test).unwrap();
+        let pack = kpack::decode(&kpack::encode(&b.finish("2026-11-13".into()))).unwrap();
+        assert_eq!(stats.held_out, from_models_stats.held_out);
+        assert_eq!(stats.ingest.names_kept, from_models_stats.ingest.names_kept);
+        assert_eq!(stats.ingest.resolved, from_models_stats.ingest.resolved);
+        for name in ["Glc", "glucose", "G6P", "ATP", "hexokinase", "s1"] {
+            assert_eq!(from_models(&pack, name), from_models(&from_models_pack, name), "{name}");
+        }
+    }
+    let _ = std::fs::remove_file(&digest);
+}

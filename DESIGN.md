@@ -709,11 +709,32 @@ Known issues / next (in order):
   are left alone, and so is Enter on a button or link.
 - Started (2026-11-14): publishing. `.github/workflows/pages.yml` runs on
   every push to main: Rust stable with the wasm32 target, Trunk (pinned
-  release binary), the source data from an Actions cache (downloaded only
-  on a cache miss, so deploys are reproducible; the key `SOURCES_CACHE`
-  names the data snapshot), `kpack-build build`, `trunk build --release
+  release binary), `kpack-build build --cache data/snapshot`, `trunk build --release
   --public-url /PathwayAnnotator/`, then upload-pages-artifact and
-  deploy-pages. Checked locally: the site built for that sub-path, served
+  deploy-pages. The first run failed: BioModels' server (behind CloudFront)
+  answers GitHub's build machines with HTTP 403, while BiGG and ChEBI
+  downloaded fine. The pack takes only `MinedModel`s from BioModels (each
+  model's annotated species and reactions: id, name, `is`/`isVersionOf`
+  resources), so `kpack-build digest-biomodels` writes them to
+  `data/snapshot/biomodels-digest.json.gz` (1.5 MB for 1,075 models, CC0,
+  kept in the repository) and `build` reads it when `<cache>/biomodels` is
+  absent (`biomodels::load_digest`; the test models can still be held
+  out). A pack built from the digest has exactly the same labels and
+  synonyms as one built from the models, and the benchmark on a training
+  pack built from it is unchanged (90.8% / 82.7%). Then BiGG and ChEBI
+  went into the repository too (`data/snapshot`, 42 MB with the digest,
+  with a README carrying the attributions and BiGG's notice): the build
+  downloads nothing, and every deploy uses the same data until the
+  snapshot is refreshed and committed (a GitHub Actions cache would be
+  dropped after 7 days unused, and BiGG only serves current data). ChEBI is pinned to one release (`chebi::RELEASE`,
+  257): `fetch` takes it from EBI's archive (archive/relNNN/flat_files, the
+  same layout) once it is archived, else from the current files after
+  checking their README says that release; a newer current release is an
+  error, not a silent change; that matters when refreshing the snapshot.
+  (Pack files are not byte-for-byte reproducible:
+  strings are interned in hash-map order. Contents are.) Actions updated
+  to their Node 24 versions (checkout v7, cache v6, upload-pages-artifact
+  v5, deploy-pages v5). Checked locally: the site built for that sub-path, served
   under it, loads the pack and the example, and About shows every source,
   its license and the BiGG notice. Needs Settings > Pages > Source:
   GitHub Actions before the first run. (On Windows Git Bash, run the

@@ -27,7 +27,9 @@ enum Command {
         #[arg(long, default_value = "all")]
         source: String,
     },
-    /// Build a pack from the cached sources.
+    /// Build a pack from the cached sources. BioModels comes from the
+    /// cached models if there are any, else from the digest (see
+    /// digest-biomodels).
     Build {
         #[arg(long, default_value = "data/cache")]
         cache: PathBuf,
@@ -36,6 +38,17 @@ enum Command {
         /// Leave the benchmark's test models out of the BioModels names.
         #[arg(long)]
         exclude_test_models: bool,
+        #[arg(long, default_value = BIOMODELS_DIGEST)]
+        biomodels_digest: PathBuf,
+    },
+    /// Write what the pack needs from the cached BioModels models (names
+    /// and annotations of their species and reactions) to a small file kept
+    /// in the repository, for building where BioModels cannot be reached.
+    DigestBiomodels {
+        #[arg(long, default_value = "data/cache")]
+        cache: PathBuf,
+        #[arg(long, default_value = BIOMODELS_DIGEST)]
+        out: PathBuf,
     },
     /// Summarize a pack.
     Stats { pack: PathBuf },
@@ -51,7 +64,10 @@ fn main() -> ExitCode {
             cache,
             out,
             exclude_test_models,
-        } => build(&cache, &out, exclude_test_models),
+            biomodels_digest,
+        } => build(&cache, &out, exclude_test_models, &biomodels_digest),
+        Command::DigestBiomodels { cache, out } => sources::biomodels::write_digest(&cache.join("biomodels"), &out)
+            .map(|n| eprintln!("wrote {} ({n} models)", out.display())),
         Command::Stats { pack } => load(&pack).map(|p| stats(&p)),
         Command::Lookup { pack, query } => load(&pack).map(|p| lookup(&p, &query)),
     };
@@ -88,7 +104,16 @@ fn fetch_sources(cache: &std::path::Path, source: &str) -> Result<()> {
     }
 }
 
-fn build(cache: &std::path::Path, out: &std::path::Path, exclude_test_models: bool) -> Result<()> {
+/// Where the BioModels digest is kept (in the repository, with the other
+/// source data the published pack is built from).
+const BIOMODELS_DIGEST: &str = "data/snapshot/biomodels-digest.json.gz";
+
+fn build(
+    cache: &std::path::Path,
+    out: &std::path::Path,
+    exclude_test_models: bool,
+    biomodels_digest: &std::path::Path,
+) -> Result<()> {
     let mut b = PackBuilder::new();
     let bigg_dir = cache.join("bigg");
     let s = sources::bigg::load(&mut b, &bigg_dir, &fetch::fetched_date(&bigg_dir))?;
@@ -117,7 +142,12 @@ fn build(cache: &std::path::Path, out: &std::path::Path, exclude_test_models: bo
         sources::chebi::MAX_FANOUT
     );
     let bm_dir = cache.join("biomodels");
-    let m = sources::biomodels::load(&mut b, &bm_dir, &fetch::fetched_date(&bm_dir), exclude_test_models)?;
+    let m = if bm_dir.join(sources::biomodels::INDEX_FILE).exists() {
+        sources::biomodels::load(&mut b, &bm_dir, &fetch::fetched_date(&bm_dir), exclude_test_models)?
+    } else {
+        eprintln!("BioModels: no cached models; using {}", biomodels_digest.display());
+        sources::biomodels::load_digest(&mut b, biomodels_digest, exclude_test_models)?
+    };
     let i = &m.ingest;
     eprintln!(
         "BioModels: {} models listed, {} mined, {} held out, {} missing, {} unreadable",

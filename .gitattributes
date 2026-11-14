@@ -1,0 +1,2 @@
+# Source data snapshot: large data files, not code. No line diffs.
+data/snapshot/** -diff linguist-vendored

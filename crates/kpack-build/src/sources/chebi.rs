@@ -39,7 +39,18 @@ use kpack::{EntityId, NameHit, NameKind, SourceInfo, Sources, Xref, XrefScope};
 
 use crate::builder::{PackBuilder, merge_xref};
 
+/// The ChEBI release packs are built from. Pinned, so every download gives
+/// the same data; to move to a newer release, change it (and the
+/// workflow's SOURCES_CACHE) and rebuild.
+pub const RELEASE: &str = "257";
+/// The current release's files.
 pub const BASE_URL: &str = "https://ftp.ebi.ac.uk/pub/databases/chebi/flat_files/";
+
+/// Where EBI keeps a past release's files ("rel256"). A release is
+/// archived once the next one comes out.
+pub fn archive_url(release: &str) -> String {
+    format!("https://ftp.ebi.ac.uk/pub/databases/chebi/archive/rel{release}/flat_files/")
+}
 pub const COMPOUNDS_FILE: &str = "compounds.tsv.gz";
 pub const NAMES_FILE: &str = "names.tsv.gz";
 pub const CHEMICAL_DATA_FILE: &str = "chemical_data.tsv.gz";

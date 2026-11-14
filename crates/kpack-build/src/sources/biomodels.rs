@@ -29,7 +29,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use kpack::{NameHit, NameKind, NsId, SourceInfo, Sources, StrId, Target, XrefScope};
 
@@ -178,14 +178,14 @@ fn query_escape(s: &str) -> String {
 // --- mining a model ------------------------------------------------------------
 
 /// What an annotated element is.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ElementKind {
     Species,
     Reaction,
 }
 
 /// One species or reaction and what it is annotated as.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Element {
     pub kind: ElementKind,
     pub id: String,
@@ -195,7 +195,7 @@ pub struct Element {
 }
 
 /// The annotated elements of one model.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MinedModel {
     pub id: String,
     pub elements: Vec<Element>,
@@ -446,7 +446,17 @@ pub struct LoadStats {
 
 /// Mines the cached models in `dir` and adds their names to the pack. With
 /// `exclude_test`, models in the benchmark's test set are left out.
-pub fn load(b: &mut PackBuilder, dir: &Path, version: &str, exclude_test: bool) -> Result<LoadStats> {
+/// What a digest holds: the date the models were fetched, and what was
+/// mined from each ([`write_digest`]).
+#[derive(Serialize, Deserialize)]
+struct Digest {
+    fetched: String,
+    models: Vec<MinedModel>,
+}
+
+/// Mines every cached model in `dir` (as [`load`] does, test models
+/// included). Returns the models and the load statistics.
+fn mine_cache(dir: &Path, exclude_test: bool) -> Result<(Vec<MinedModel>, LoadStats)> {
     let index = std::fs::read_to_string(dir.join(INDEX_FILE))
         .map_err(|e| format!("cannot read {}: {e}; run `kpack-build fetch` first", dir.join(INDEX_FILE).display()))?;
     let ids: Vec<String> = serde_json::from_str(&index)?;
@@ -469,6 +479,72 @@ pub fn load(b: &mut PackBuilder, dir: &Path, version: &str, exclude_test: bool) 
             Err(e) => stats.unreadable.push((id.clone(), e)),
         }
     }
+    Ok((models, stats))
+}
+
+/// Writes what the pack needs from the cached models (each model's
+/// annotated species and reactions: names and annotation resources) to
+/// `out`, gzipped JSON. A few MB instead of the models' 180 MB, so it is
+/// kept in the repository (data/snapshot) and used where BioModels cannot
+/// be reached (its server refuses GitHub's build machines). Returns how
+/// many models.
+pub fn write_digest(dir: &Path, out: &Path) -> Result<usize> {
+    let (models, stats) = mine_cache(dir, false)?;
+    if stats.missing > 0 {
+        return Err(format!("{} cached models are missing; run `kpack-build fetch --source biomodels`", stats.missing).into());
+    }
+    let digest = Digest {
+        fetched: crate::fetch::fetched_date(dir),
+        models,
+    };
+    if let Some(parent) = out.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let file = std::fs::File::create(out)?;
+    let mut gz = flate2::write::GzEncoder::new(std::io::BufWriter::new(file), flate2::Compression::best());
+    serde_json::to_writer(&mut gz, &digest)?;
+    gz.finish()?;
+    Ok(digest.models.len())
+}
+
+fn read_digest(path: &Path) -> Result<Digest> {
+    let file = std::fs::File::open(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+    Ok(serde_json::from_reader(flate2::read::GzDecoder::new(std::io::BufReader::new(file)))?)
+}
+
+/// Adds BioModels to the pack from a digest ([`write_digest`]) rather
+/// than the cached models. `exclude_test` holds out the test models, as
+/// [`load`] does.
+pub fn load_digest(b: &mut PackBuilder, path: &Path, exclude_test: bool) -> Result<LoadStats> {
+    let digest = read_digest(path)?;
+    let mut stats = LoadStats {
+        listed: digest.models.len(),
+        ..LoadStats::default()
+    };
+    let models: Vec<MinedModel> = digest
+        .models
+        .into_iter()
+        .filter(|m| {
+            let out = exclude_test && is_test_model(&m.id);
+            stats.held_out += usize::from(out);
+            !out
+        })
+        .collect();
+    finish_load(b, models, stats, &digest.fetched, exclude_test)
+}
+
+pub fn load(b: &mut PackBuilder, dir: &Path, version: &str, exclude_test: bool) -> Result<LoadStats> {
+    let (models, stats) = mine_cache(dir, exclude_test)?;
+    finish_load(b, models, stats, version, exclude_test)
+}
+
+fn finish_load(
+    b: &mut PackBuilder,
+    models: Vec<MinedModel>,
+    mut stats: LoadStats,
+    version: &str,
+    exclude_test: bool,
+) -> Result<LoadStats> {
     stats.ingest = ingest(b, &models);
     let split = if exclude_test { ", test set excluded" } else { "" };
     b.add_source(SourceInfo {
