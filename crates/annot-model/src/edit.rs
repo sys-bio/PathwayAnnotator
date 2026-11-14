@@ -137,6 +137,40 @@ impl Workspace {
         Ok(())
     }
 
+    /// An element's SBO term, as a number (`SBO:0000247` -> 247).
+    pub fn sbo(&self, el: Element) -> Option<u32> {
+        if !self.contains(el) {
+            return None;
+        }
+        let t = self.meta(el).sbo_term.as_deref()?;
+        t.trim().trim_start_matches("SBO:").parse().ok()
+    }
+
+    /// Moves one resource from one biology qualifier to another ("is" to
+    /// "isVersionOf"), keeping its place in the annotation otherwise. One
+    /// undoable edit; nothing changes if the resource is not under `from`.
+    pub fn change_qualifier(&mut self, el: Element, uri: &str, from: &str, to: &str) -> Result<(), EditError> {
+        check_qualifier(from)?;
+        check_qualifier(to)?;
+        if from == to {
+            return Ok(());
+        }
+        let meta = self.with_terms(el, |terms| {
+            let mut moved = false;
+            for t in terms.iter_mut().filter(|t| !t.model && t.qualifier == from) {
+                let before = t.resources.len();
+                t.resources.retain(|r| r != uri);
+                moved |= t.resources.len() != before;
+            }
+            if moved {
+                add(terms, to, &[uri.to_string()])?;
+            }
+            Ok(())
+        })?;
+        self.apply(el, meta);
+        Ok(())
+    }
+
     /// Sets or clears an element's SBO term.
     pub fn set_sbo(&mut self, el: Element, sbo: Option<u32>) -> Result<(), EditError> {
         if !self.contains(el) {

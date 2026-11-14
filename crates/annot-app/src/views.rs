@@ -9,7 +9,7 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 
 use crate::browser;
-use crate::session::{Counts, Session, Status};
+use crate::session::{Counts, QUALIFIER_WORDS, Session, Status, sbo_choices};
 
 type SessionSignal = RwSignal<Option<Session>, LocalStorage>;
 
@@ -921,12 +921,12 @@ fn OrganismChoice() -> impl IntoView {
         <label class="organism">
             <span class="muted">"Proteins from "</span>
             <select on:change=move |ev| ctx.organism.set(event_target_value(&ev).parse().ok())>
-                <option value="" selected=move || ctx.organism.get().is_none()>"any organism"</option>
+                <option value="" prop:selected=move || ctx.organism.get().is_none()>"any organism"</option>
                 {options
                     .into_iter()
                     .map(|(id, name)| {
                         view! {
-                            <option value=id.to_string() selected=move || ctx.organism.get() == Some(id)>
+                            <option value=id.to_string() prop:selected=move || ctx.organism.get() == Some(id)>
                                 {name}
                             </option>
                         }
@@ -939,6 +939,201 @@ fn OrganismChoice() -> impl IntoView {
 
 /// How many proteins to show when none has exactly the name searched for.
 const PROTEINS_SHOWN: usize = 3;
+
+/// An edit of the session that says what it did, or why it could not.
+type SessionEdit = Box<dyn FnOnce(&mut Session) -> Result<String, String>>;
+
+/// The element's annotation, editable: its SBO term, and each MIRIAM term
+/// with its qualifier (changeable) and a Remove button, and a row for
+/// adding one. Every change is one undo step. Model qualifiers
+/// (`bqmodel:`) are shown but left alone.
+#[component]
+fn AnnotationEditor(el: Element) -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    let s = ctx.session;
+    let terms = move || s.with(|s| s.as_ref().map(|s| s.ws.terms(el)).unwrap_or_default());
+    let sbo = move || s.with(|s| s.as_ref().and_then(|s| s.ws.sbo(el)));
+    let error = RwSignal::new(None::<String>);
+    let add_q = RwSignal::new("is".to_string());
+    let add_text = RwSignal::new(String::new());
+    let other_sbo = RwSignal::new(String::new());
+    // Runs an edit, showing its message at the bottom or its error here.
+    let run = move |f: SessionEdit| {
+        let mut out = None;
+        s.update(|s| {
+            if let Some(s) = s {
+                out = Some(f(s));
+            }
+        });
+        match out {
+            Some(Ok(msg)) => {
+                error.set(None);
+                ctx.message.set(Some(msg));
+            }
+            Some(Err(e)) => error.set(Some(e)),
+            None => {}
+        }
+    };
+    let add = move || {
+        let (q, text) = (add_q.get_untracked(), add_text.get_untracked());
+        run(Box::new(move |s| s.add_term(el, &q, &text)));
+        if error.get_untracked().is_none() {
+            add_text.set(String::new());
+        }
+    };
+    let set_other_sbo = move || {
+        let t = other_sbo.get_untracked();
+        match t.trim().trim_start_matches("SBO:").trim_start_matches("sbo:").parse::<u32>() {
+            Ok(n) if n > 0 && n < 10_000_000 => {
+                run(Box::new(move |s| s.set_sbo(el, Some(n))));
+                other_sbo.set(String::new());
+            }
+            _ => error.set(Some("An SBO term is a number, such as 247 or SBO:0000247.".into())),
+        }
+    };
+    let qualifier_menu = move |current: String, on_pick: Box<dyn Fn(String)>| {
+        view! {
+            <select class="qualifier-menu" on:change=move |ev| on_pick(event_target_value(&ev))>
+                {QUALIFIER_WORDS
+                    .iter()
+                    .map(|(q, words)| {
+                        view! { <option value=*q prop:selected=*q == current.as_str()>{*words}</option> }
+                    })
+                    .collect_view()}
+            </select>
+        }
+    };
+
+    let sbo_row = move || {
+        let current = sbo();
+        let choices = sbo_choices(el);
+        let known = current.is_some_and(|n| choices.iter().any(|(c, _)| *c == n));
+        view! {
+            <div class="sbo-row">
+                <label>
+                    <span class="muted">"Kind (SBO term) "</span>
+                    <select on:change=move |ev| {
+                        let v = event_target_value(&ev);
+                        let n = v.parse::<u32>().ok();
+                        run(Box::new(move |s| s.set_sbo(el, n)));
+                    }>
+                        <option value="" prop:selected=current.is_none()>"none"</option>
+                        {choices
+                            .iter()
+                            .map(|(n, name)| {
+                                view! {
+                                    <option value=n.to_string() prop:selected=current == Some(*n)>
+                                        {format!("{name} (SBO:{n:07})")}
+                                    </option>
+                                }
+                            })
+                            .collect_view()}
+                        {current
+                            .filter(|_| !known)
+                            .map(|n| view! { <option value=n.to_string() prop:selected=true>{format!("SBO:{n:07}")}</option> })}
+                    </select>
+                </label>
+                {current
+                    .map(|n| {
+                        view! {
+                            <a href=format!("https://identifiers.org/SBO:{n:07}") target="_blank" rel="noopener noreferrer">
+                                "check"
+                            </a>
+                        }
+                    })}
+                <label>
+                    <span class="muted">"or another: "</span>
+                    <input
+                        type="text"
+                        class="sbo-number"
+                        placeholder="SBO:0000247"
+                        prop:value=move || other_sbo.get()
+                        on:input=move |ev| other_sbo.set(event_target_value(&ev))
+                        on:keydown=move |ev: web_sys::KeyboardEvent| {
+                            if ev.key() == "Enter" {
+                                set_other_sbo();
+                            }
+                        }
+                    />
+                </label>
+                <button on:click=move |_| set_other_sbo()>"Set"</button>
+            </div>
+        }
+    };
+
+    let term_rows = move || {
+        terms()
+            .into_iter()
+            .map(|t| {
+                let uri = t.uri.clone();
+                let qualifier = if t.model {
+                    view! { <span class="qualifier">{format!("model {}", t.qualifier)}</span> }.into_any()
+                } else {
+                    let (uri, from) = (uri.clone(), t.qualifier.clone());
+                    qualifier_menu(
+                        t.qualifier.clone(),
+                        Box::new(move |to: String| {
+                            let (uri, from) = (uri.clone(), from.clone());
+                            run(Box::new(move |s| s.change_qualifier(el, &uri, &from, &to)));
+                        }),
+                    )
+                    .into_any()
+                };
+                let remove = (!t.model).then(|| {
+                    let (uri, q) = (uri.clone(), t.qualifier.clone());
+                    view! {
+                        <button
+                            class="link"
+                            title="Remove this from the annotation"
+                            on:click=move |_| {
+                                let (uri, q) = (uri.clone(), q.clone());
+                                run(Box::new(move |s| s.remove_term(el, &q, &uri)));
+                            }
+                        >
+                            "Remove"
+                        </button>
+                    }
+                });
+                view! {
+                    <li>
+                        {qualifier}
+                        <a href=uri.clone() target="_blank" rel="noopener noreferrer">{uri.clone()}</a>
+                        {remove}
+                    </li>
+                }
+            })
+            .collect_view()
+    };
+
+    view! {
+        <div class="annotation">
+            <h4>"Annotation"</h4>
+            {sbo_row}
+            <ul class="terms edit">{term_rows}</ul>
+            <div class="add-term">
+                <span class="muted">"Add: this "</span>
+                {qualifier_menu(add_q.get_untracked(), Box::new(move |q| add_q.set(q)))}
+                <input
+                    type="text"
+                    placeholder="CHEBI:15422, uniprot:P12345 or a URL"
+                    prop:value=move || add_text.get()
+                    on:input=move |ev| add_text.set(event_target_value(&ev))
+                    on:keydown=move |ev: web_sys::KeyboardEvent| {
+                        if ev.key() == "Enter" {
+                            add();
+                        }
+                    }
+                />
+                <button on:click=move |_| add()>"Add"</button>
+            </div>
+            <p class="hint">
+                "\"is\" says it is that entry; \"is a version of\" points to a more general one (glucose for "
+                "alpha-D-glucose); \"has part\" lists the members of a complex. Each change can be undone."
+            </p>
+            {move || error.get().map(|e| view! { <p class="error" role="alert">{e}</p> })}
+        </div>
+    }
+}
 
 /// What a search of other databases has come to.
 #[derive(Clone)]
@@ -1347,30 +1542,10 @@ fn Details(el: Element) -> impl IntoView {
                 .collect::<Vec<_>>()
         })
     };
-    let existing = move || s.with(|s| s.as_ref().map(|s| s.ws.terms(el)).unwrap_or_default());
     view! {
         <div class="details">
             <RenameId el=el/>
-            <Show when=move || !existing().is_empty()>
-                <h4>"Current annotation"</h4>
-                <ul class="terms">
-                    {move || {
-                        existing()
-                            .into_iter()
-                            .map(|t| {
-                                let q = if t.model { format!("model {}", t.qualifier) } else { t.qualifier.clone() };
-                                view! {
-                                    <li>
-                                        <span class="qualifier">{q}</span>
-                                        " "
-                                        <a href=t.uri.clone() target="_blank" rel="noopener">{t.uri.clone()}</a>
-                                    </li>
-                                }
-                            })
-                            .collect_view()
-                    }}
-                </ul>
-            </Show>
+            <AnnotationEditor el=el/>
             <Show when=move || !matches!(el, Element::Compartment(_))>
             <h4>"Suggestions"</h4>
             {move || {

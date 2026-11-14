@@ -207,6 +207,32 @@ fn replacing_keeps_what_the_pack_does_not_know() {
 }
 
 #[test]
+fn changing_a_qualifier_and_reading_sbo() {
+    let mut w = load(MODEL).unwrap();
+    let el = Element::Species(0);
+    let uri = w.identity_uris(el)[0].clone();
+    let before = w.to_sbml();
+    w.change_qualifier(el, &uri, "is", "isVersionOf").unwrap();
+    let terms = w.terms(el);
+    assert_eq!(terms.len(), 1);
+    assert_eq!((terms[0].qualifier.as_str(), terms[0].uri.as_str()), ("isVersionOf", uri.as_str()));
+    // Other annotation content is kept.
+    assert!(w.to_sbml().contains("tool:data"));
+    // Not there: nothing changes, nothing to undo.
+    w.change_qualifier(el, "https://identifiers.org/CHEBI:1", "is", "hasPart").unwrap();
+    assert!(w.change_qualifier(el, &uri, "isVersionOf", "isSortOf").is_err());
+    assert!(w.undo());
+    assert_eq!(w.to_sbml(), before);
+    assert!(!w.can_undo());
+
+    assert_eq!(w.sbo(el), None);
+    w.set_sbo(el, Some(247)).unwrap();
+    assert_eq!(w.sbo(el), Some(247));
+    w.set_sbo(el, None).unwrap();
+    assert_eq!(w.sbo(el), None);
+}
+
+#[test]
 fn removing_a_term() {
     let mut w = load(MODEL).unwrap();
     let urn = "urn:miriam:obo.chebi:CHEBI%3A4170";

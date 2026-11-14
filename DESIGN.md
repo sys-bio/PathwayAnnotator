@@ -668,7 +668,22 @@ Known issues / next (in order):
   views.rs, measured in the frame the card appears, so it does not flash).
   The extra space below the list is gone.
 - Started (2026-11-14): searching other databases; see "Searching other
-  databases" below. No SBO / qualifier editing in the UI yet.
+  databases" below.
+- Done (2026-11-14): editing the annotation in Details ("Annotation"). The
+  SBO term from a menu of terms that suit the element (molecules: simple
+  chemical, ion, protein, complex, RNA, DNA, gene, ...; reactions:
+  biochemical, translocation, exchange, sink, demand, binding, ...;
+  compartments: physical, functional, implicit; names checked against
+  SBO), any other number, or none. Each MIRIAM term has a qualifier menu
+  in words ("is a version of (a kind of)") and Remove; a row adds a term
+  from a compact identifier (CHEBI:15422, uniprot:P12345: written as an
+  identifiers.org URI) or a full URL (`annot_model::uri_from_text`).
+  Model qualifiers (`bqmodel:`) are shown, not edited. Each change is one
+  undo step (`Workspace::change_qualifier`, `add_terms`, `remove_term`,
+  `set_sbo`; `Workspace::sbo` reads it). Menus set the `selected`
+  property, not the attribute: Leptos updates rows in place, and a menu
+  the user has touched ignores attribute changes (it showed the old
+  qualifier after Undo).
 - Done (2026-11-14): keyboard shortcuts (`on_key` in views.rs; the list is
   the `Shortcuts` panel, opened with ? or the Shortcuts button in the
   header). A row cursor (j / k or arrows; n jumps to the next row with a

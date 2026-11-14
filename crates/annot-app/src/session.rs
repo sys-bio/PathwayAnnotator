@@ -51,6 +51,73 @@ pub struct MoleculeInfo {
     pub link: Option<String>,
 }
 
+/// The biology qualifiers in words, for people: (qualifier, words). "is"
+/// first, then the ones modelers use most.
+pub const QUALIFIER_WORDS: &[(&str, &str)] = &[
+    ("is", "is"),
+    ("isVersionOf", "is a version of (a kind of)"),
+    ("hasVersion", "has version (a more specific kind)"),
+    ("hasPart", "has part"),
+    ("isPartOf", "is part of"),
+    ("isHomologTo", "is homologous to"),
+    ("isDescribedBy", "is described by"),
+    ("isEncodedBy", "is encoded by"),
+    ("encodes", "encodes"),
+    ("occursIn", "occurs in"),
+    ("hasProperty", "has property"),
+    ("isPropertyOf", "is a property of"),
+    ("hasTaxon", "is in organism"),
+];
+
+/// A qualifier in words ("isVersionOf" -> "is a version of (a kind of)").
+pub fn qualifier_words(q: &str) -> &str {
+    QUALIFIER_WORDS.iter().find(|(k, _)| *k == q).map_or(q, |(_, w)| w)
+}
+
+/// The SBO terms that suit an element, with their names (checked against
+/// the SBO ontology, 2026-11-14).
+pub fn sbo_choices(el: Element) -> &'static [(u32, &'static str)] {
+    match el {
+        Element::Species(_) => &[
+            (247, "simple chemical"),
+            (327, "non-macromolecular ion"),
+            (252, "polypeptide chain (protein)"),
+            (297, "protein complex"),
+            (253, "non-covalent complex"),
+            (245, "macromolecule"),
+            (250, "ribonucleic acid (RNA)"),
+            (278, "messenger RNA"),
+            (251, "deoxyribonucleic acid (DNA)"),
+            (243, "gene"),
+            (240, "material entity"),
+            (285, "material entity of unspecified nature"),
+        ],
+        Element::Reaction(_) => &[
+            (176, "biochemical reaction"),
+            (185, "translocation reaction (transport)"),
+            (167, "biochemical or transport reaction"),
+            (627, "exchange reaction"),
+            (632, "sink reaction"),
+            (628, "demand reaction"),
+            (177, "non-covalent binding"),
+            (180, "dissociation"),
+            (182, "conversion"),
+            (200, "redox reaction"),
+            (216, "phosphorylation"),
+            (179, "degradation"),
+            (183, "transcription"),
+            (184, "translation"),
+            (375, "process"),
+        ],
+        Element::Compartment(_) => &[
+            (290, "physical compartment"),
+            (289, "functional compartment"),
+            (410, "implicit compartment"),
+        ],
+        Element::Model => &[],
+    }
+}
+
 /// Counts for the overview.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Counts {
@@ -724,6 +791,46 @@ impl Session {
         };
         self.refresh();
         msg
+    }
+
+    /// Sets or clears an element's SBO term. Returns a message for the user.
+    pub fn set_sbo(&mut self, el: Element, sbo: Option<u32>) -> Result<String, String> {
+        let name = self.display_name(el);
+        self.ws.set_sbo(el, sbo).map_err(|e| format!("Could not change {name}: {e}."))?;
+        self.refresh();
+        Ok(match sbo {
+            Some(n) => format!("{name} now has SBO term SBO:{n:07}."),
+            None => format!("{name} no longer has an SBO term."),
+        })
+    }
+
+    /// Moves an annotation resource to another qualifier.
+    pub fn change_qualifier(&mut self, el: Element, uri: &str, from: &str, to: &str) -> Result<String, String> {
+        let name = self.display_name(el);
+        self.ws.change_qualifier(el, uri, from, to).map_err(|e| format!("Could not change {name}: {e}."))?;
+        self.refresh();
+        Ok(format!("{name}: {} {uri}.", qualifier_words(to)))
+    }
+
+    /// Removes one annotation term.
+    pub fn remove_term(&mut self, el: Element, qualifier: &str, uri: &str) -> Result<String, String> {
+        let name = self.display_name(el);
+        self.ws.remove_term(el, qualifier, uri).map_err(|e| format!("Could not change {name}: {e}."))?;
+        self.refresh();
+        Ok(format!("Removed {uri} from {name}."))
+    }
+
+    /// Adds an annotation term from what the user typed (a compact
+    /// identifier or a URL; [`annot_model::uri_from_text`]).
+    pub fn add_term(&mut self, el: Element, qualifier: &str, text: &str) -> Result<String, String> {
+        let name = self.display_name(el);
+        let uri = annot_model::uri_from_text(text)?;
+        if self.ws.terms(el).iter().any(|t| !t.model && t.qualifier == qualifier && t.uri == uri) {
+            return Err(format!("{name} already has that."));
+        }
+        self.ws.add_terms(el, qualifier, std::slice::from_ref(&uri)).map_err(|e| format!("Could not change {name}: {e}."))?;
+        self.refresh();
+        Ok(format!("{name}: {} {uri}.", qualifier_words(qualifier)))
     }
 
     /// The file name for the annotated model: "model.xml" -> "model-annotated.xml".

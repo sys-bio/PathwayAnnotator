@@ -60,6 +60,35 @@ pub fn uris_for(pack: &Pack, target: Target) -> Vec<String> {
     out
 }
 
+/// The annotation URI for what someone typed: a full URI as it is
+/// ("https://...", "http://...", "urn:miriam:..."), or a compact
+/// identifier ("CHEBI:15422", "uniprot:P12345", "GO:0005829",
+/// "ec-code:2.7.1.1") as an identifiers.org URI. `Err` says how to write
+/// it.
+pub fn uri_from_text(text: &str) -> Result<String, String> {
+    let t = text.trim();
+    if t.is_empty() {
+        return Err("Write an identifier such as CHEBI:15422, or a full URL.".into());
+    }
+    if t.contains(char::is_whitespace) {
+        return Err("An identifier has no spaces: write it as prefix:id (CHEBI:15422) or a full URL.".into());
+    }
+    let lower = t.to_ascii_lowercase();
+    if lower.starts_with("https://") || lower.starts_with("http://") || lower.starts_with("urn:miriam:") {
+        return Ok(t.to_string());
+    }
+    match t.split_once(':') {
+        Some((prefix, id))
+            if !prefix.is_empty()
+                && !id.is_empty()
+                && prefix.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')) =>
+        {
+            Ok(format!("https://identifiers.org/{t}"))
+        }
+        _ => Err("Write it as prefix:id (CHEBI:15422, uniprot:P12345) or a full URL.".into()),
+    }
+}
+
 /// The SBO term for accepting `target`: simple chemical (247) for a
 /// molecule, transport reaction (185) or biochemical reaction (176).
 pub fn sbo_for(pack: &Pack, target: Target) -> u32 {
@@ -73,6 +102,18 @@ pub fn sbo_for(pack: &Pack, target: Target) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typed_identifiers() {
+        assert_eq!(uri_from_text(" CHEBI:15422 ").unwrap(), "https://identifiers.org/CHEBI:15422");
+        assert_eq!(uri_from_text("uniprot:P12345").unwrap(), "https://identifiers.org/uniprot:P12345");
+        assert_eq!(uri_from_text("ec-code:2.7.1.1").unwrap(), "https://identifiers.org/ec-code:2.7.1.1");
+        assert_eq!(uri_from_text("http://identifiers.org/chebi/CHEBI:1").unwrap(), "http://identifiers.org/chebi/CHEBI:1");
+        assert_eq!(uri_from_text("urn:miriam:obo.chebi:CHEBI%3A1").unwrap(), "urn:miriam:obo.chebi:CHEBI%3A1");
+        for bad in ["", "glucose", "CHEBI 15422", ":15422", "CHEBI:", "a b:c"] {
+            assert!(uri_from_text(bad).is_err(), "{bad:?}");
+        }
+    }
 
     #[test]
     fn compact_uris() {
