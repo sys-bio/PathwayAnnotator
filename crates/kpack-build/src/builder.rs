@@ -414,6 +414,26 @@ impl PackBuilder {
         }
     }
 
+    /// Gives molecules labelled as ChEBI names their charged form an
+    /// everyday label ([`labels::familiar_entity_label`]): "3-phosphonato-
+    /// D-glycerate" becomes 3-phospho-D-glycerate. Runs before synonyms
+    /// are picked, so the old label can still be offered as one.
+    fn familiar_labels(&mut self) {
+        let mut names: HashMap<u32, Vec<String>> = HashMap::new();
+        for (n, h) in &self.entity_names {
+            if matches!(h.kind, NameKind::Preferred | NameKind::Synonym) {
+                names.entry(h.target).or_default().push(n.clone());
+            }
+        }
+        for i in 0..self.entities.len() {
+            let label = self.strings.get(self.entities[i].label).to_string();
+            let own: Vec<&str> = names.get(&(i as u32)).map(|v| v.iter().map(String::as_str).collect()).unwrap_or_default();
+            if let Some(better) = labels::familiar_entity_label(&label, &own) {
+                self.entities[i].label = self.strings.intern(&better);
+            }
+        }
+    }
+
     /// Gives reactions labelled only by an id ("PGKf") a name: their most
     /// familiar synonym; else the name of a reaction that is the same
     /// chemistry (shares a Rhea, MetaNetX, MetaCyc, KEGG or SEED reaction
@@ -492,6 +512,7 @@ impl PackBuilder {
     /// Indexes everything into a pack.
     pub fn finish(mut self, built: String) -> Pack {
         self.tidy_labels();
+        self.familiar_labels();
         self.fill_synonyms();
         self.name_id_only_reactions();
         let names = NameIndex::build(std::mem::take(&mut self.entity_names), |s| {

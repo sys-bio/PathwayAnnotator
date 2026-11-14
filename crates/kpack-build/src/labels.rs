@@ -36,6 +36,100 @@ pub fn tidy_entity_label(label: &str) -> String {
     kpack::strip_charge_suffix(s).to_string()
 }
 
+/// Prefixes that name a group in its charged form, and the everyday
+/// prefix: "3-phosphonato-D-glycerate" is 3-phospho-D-glycerate.
+const CHARGED_PREFIXES: &[(&str, &str)] = &[
+    ("triphosphonato", "triphospho"),
+    ("diphosphonato", "diphospho"),
+    ("phosphonato", "phospho"),
+    ("carboxylato", "carboxy"),
+    ("sulfonato", "sulfo"),
+];
+
+/// Endings that name a molecule in its protonated (cation) form, and the
+/// everyday ending: L-argininium is L-arginine, dimethylaminium is
+/// dimethylamine, 1,4-butanediammonium is 1,4-butanediamine.
+const CHARGED_ENDINGS: &[(&str, &str)] = &[
+    ("diammonium", "diamine"),
+    ("aminium", "amine"),
+    ("ammonium", "amine"),
+    ("inium", "ine"),
+];
+
+/// Ions whose everyday name is another word: (label, familiar name).
+const ION_NAMES: &[(&str, &str)] = &[("hydrogenphosphate", "phosphate"), ("hydrogencarbonate", "bicarbonate")];
+
+/// The everyday name of a molecule whose label names it as ChEBI names the
+/// form that dominates at cell pH ("3-phosphonato-D-glycerate",
+/// "L-argininium", "D-glucopyranose", "hydrogenphosphate"). `names` are
+/// all the names the sources give it. `None` when the label is already
+/// everyday, or no safe replacement is known.
+///
+/// The group prefixes ("phosphonato" -> "phospho") are a mechanical,
+/// always-correct rewrite. The other rules (cation endings, ring forms,
+/// ions) only pick a name the sources themselves give the molecule.
+pub fn familiar_entity_label(label: &str, names: &[&str]) -> Option<String> {
+    let known = |candidate: &str| -> Option<String> {
+        let key = kpack::normalize_name(candidate);
+        names.iter().find(|n| kpack::normalize_name(n) == key).map(|_| candidate.to_string())
+    };
+    let lower = label.to_ascii_lowercase();
+    // Group prefixes: rewritten whatever the sources say.
+    if CHARGED_PREFIXES.iter().any(|(from, _)| lower.contains(from)) {
+        let mut out = label.to_string();
+        for (from, to) in CHARGED_PREFIXES {
+            out = out.replace(from, to);
+        }
+        return Some(out);
+    }
+    // Ions with an everyday name.
+    if let Some((_, to)) = ION_NAMES.iter().find(|(from, _)| lower == *from) {
+        return known(to);
+    }
+    // A cation ending on the last word.
+    let (head, last) = match label.rsplit_once(' ') {
+        Some((h, l)) => (format!("{h} "), l),
+        None => (String::new(), label),
+    };
+    let last_lower = last.to_ascii_lowercase();
+    // "ammonium" alone (and the metals: sodium, calcium) is everyday.
+    if last_lower != "ammonium" {
+        for (from, to) in CHARGED_ENDINGS {
+            if let Some(stem) = last_lower.strip_suffix(from)
+                && !stem.is_empty()
+            {
+                let candidate = format!("{head}{}{to}", &last[..stem.len()]);
+                if let Some(found) = known(&candidate) {
+                    return Some(found);
+                }
+                break;
+            }
+        }
+    }
+    // Ring forms: D-glucopyranose is D-glucose.
+    for ring in ["opyranose", "ofuranose"] {
+        if lower.contains(ring) {
+            let candidate = replace_ignoring_case(label, ring, "ose");
+            return known(&candidate);
+        }
+    }
+    None
+}
+
+/// `s` with every `from` (ASCII, any case) replaced by `to`.
+fn replace_ignoring_case(s: &str, from: &str, to: &str) -> String {
+    let lower = s.to_ascii_lowercase();
+    let mut out = String::new();
+    let mut i = 0;
+    while let Some(at) = lower[i..].find(from) {
+        out.push_str(&s[i..i + at]);
+        out.push_str(to);
+        i += at + from.len();
+    }
+    out.push_str(&s[i..]);
+    out
+}
+
 /// A reaction label made readable, where it can be from the text alone:
 /// SBML escapes undone ("R_glucose_transport__uniport_" -> "glucose
 /// transport (uniport)"), a stray leading underscore and final full stop
@@ -241,6 +335,33 @@ mod tests {
         assert_eq!(tidy_entity_label("trimethylammonium"), "trimethylammonium");
         // A charge-state word alone is left alone.
         assert_eq!(tidy_entity_label("anion"), "anion");
+    }
+
+    #[test]
+    fn familiar_molecule_labels() {
+        let f = familiar_entity_label;
+        assert_eq!(f("3-phosphonato-D-glycerate", &[]).as_deref(), Some("3-phospho-D-glycerate"));
+        assert_eq!(f("(R)-5-diphosphonatomevalonate", &[]).as_deref(), Some("(R)-5-diphosphomevalonate"));
+        assert_eq!(
+            f("5-O-(1-carboxylatovinyl)-3-phosphonatoshikimate", &[]).as_deref(),
+            Some("5-O-(1-carboxyvinyl)-3-phosphoshikimate")
+        );
+        // Endings, ring forms and ions only when the sources use the name.
+        assert_eq!(f("L-argininium", &["L-arginine", "arginine"]).as_deref(), Some("L-arginine"));
+        assert_eq!(f("L-argininium", &["arginine"]), None);
+        assert_eq!(f("dimethylaminium", &["dimethylamine"]).as_deref(), Some("dimethylamine"));
+        assert_eq!(f("1,4-butanediammonium", &["1,4-Butanediamine"]).as_deref(), Some("1,4-butanediamine"));
+        assert_eq!(f("D-glucopyranose", &["D-glucose"]).as_deref(), Some("D-glucose"));
+        assert_eq!(
+            f("beta-D-fructofuranose 6-phosphate", &["beta-D-fructose 6-phosphate"]).as_deref(),
+            Some("beta-D-fructose 6-phosphate")
+        );
+        assert_eq!(f("hydrogenphosphate", &["phosphate"]).as_deref(), Some("phosphate"));
+        assert_eq!(f("hydrogencarbonate", &["carbonate"]), None);
+        // Everyday already.
+        for name in ["ammonium", "sodium", "ATP", "hydrogen cyanide", "L-leucine"] {
+            assert_eq!(f(name, &["anything"]), None, "{name}");
+        }
     }
 
     #[test]

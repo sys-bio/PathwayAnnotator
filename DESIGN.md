@@ -659,9 +659,21 @@ Known issues / next (in order):
   always this way). Synonyms that are only a charge state ("NADH
   dianion") are no longer offered. Only labels change; names the matcher
   looks up are as the sources gave them, and the benchmark is unchanged.
-- Some molecule labels are chemists' names for the charged form
-  ("3-phosphonato-D-glycerate", "hydrogenphosphate"); the familiar name is
-  shown as a synonym. Preferring a familiar label is a possible next step.
+- Done (2026-11-14): everyday molecule labels
+  (`labels::familiar_entity_label`, run in `PackBuilder::finish` before
+  synonyms are picked; 141 labels). ChEBI names the form that dominates at
+  cell pH; biologists name the molecule. Group prefixes are rewritten
+  ("3-phosphonato-D-glycerate" -> "3-phospho-D-glycerate"; also
+  carboxylato, sulfonato; 60 labels). Only when the sources give the
+  molecule that name: cation endings ("L-argininium" -> "L-arginine",
+  "dopaminium" -> "dopamine"; 43), ring forms ("D-glucopyranose" ->
+  "D-glucose", "beta-D-fructofuranose 6-phosphate" -> "beta-D-fructose
+  6-phosphate"; 36) and two ions (hydrogenphosphate -> phosphate,
+  hydrogencarbonate -> bicarbonate). The old label stays a synonym; names
+  the matcher looks up are unchanged, and so is the benchmark. Not
+  reached: trivial names no rule can derive ("glycerone phosphate" is
+  dihydroxyacetone phosphate, "1,4-butanediamine" is putrescine); a short
+  reviewed list, or BioModels name counts, could do those.
 - Done (2026-11-14): a molecule card opens upward when there is no room
   below the chip and more above, and lines up with the chip's right edge
   when it would run off the right of the window (`place_card` in

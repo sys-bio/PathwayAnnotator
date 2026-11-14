@@ -66,15 +66,15 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000340 | VK_p | VK_p | phylloquinone (phllqne) / menaquinone-9 (mqn9) / menadione (mndn) / menaquinone-8 (mqn8) / menaquinone-7 (mqn7) | - | - |
 | BIOMD0000000410 | _96 | Rec_active | peroxynitrite (CE5643) / superoxide (o2s) / hypochlorous acid (CE4633) / hydrogen peroxide (h2o2) | - | - |
 | BIOMD0000000470 | s_1435 | phosphatidylethanolamine (dihexadec-9enoyl, n-C16:1) | 1,2-distearoylphosphatidylethanolamine (pe180) / PE(18:1(11Z)/18:1(9Z)) (pe18111Z1819Z) / 1,2-dihexadecanoyl-sn-glycero-3-phosphoethanolamine (pe160) | - | - |
-| BIOMD0000000490 | Hn_aw | Hn_aw | histaminium (hista) | - | - |
-| BIOMD0000000490 | Hn_b | Hn_b | histaminium (hista) | - | - |
-| BIOMD0000000495 | mw08818dfe_fb12_45cc_8c1d_d965f142d0ce | EtnE | ethanolaminium (etha) | - | - |
+| BIOMD0000000490 | Hn_aw | Hn_aw | histamine (hista) | - | - |
+| BIOMD0000000490 | Hn_b | Hn_b | histamine (hista) | - | - |
+| BIOMD0000000495 | mw08818dfe_fb12_45cc_8c1d_d965f142d0ce | EtnE | ethanolamine (etha) | - | - |
 | BIOMD0000000495 | mw812f63db_4cb0_40ad_b92b_9874be969dfe | Cho | choline (chol) | - | - |
 | BIOMD0000000495 | mw919f8a86_e702_4b24_9cd7_adad694fcf9b | ChoE | choline (chol) | - | - |
 | BIOMD0000000505 | CarCYT |  | (R)-carnitine (crn) / (S)-carnitine (crn__D) | - | - |
 | BIOMD0000000505 | CarMAT |  | (R)-carnitine (crn) / (S)-carnitine (crn__D) | - | - |
 | BIOMD0000000505 | NADtMAT |  | (R)-NADHX (nadhx__R) / (S)-NADHX (nadhx__S) / (R)-NADPHX (nadphx__R) / (S)-NADPHX (nadphx__S) / NADH (nadh) / NAD (nad) | - | - |
-| BIOMD0000000575 | Bioamines | Bioamines | (Z)-3-aminoperacrylic acid (poaac) / 2-iminiopropionate (2amac) / trimethylammonium (tmam) / ethanolaminium (etha) / cysteaminium (cysam) | - | - |
+| BIOMD0000000575 | Bioamines | Bioamines | (Z)-3-aminoperacrylic acid (poaac) / 2-iminiopropionate (2amac) / trimethylamine (tmam) / ethanolamine (etha) / cysteamine (cysam) | - | - |
 | BIOMD0000000590 | cp | cp | carbamoyl phosphate (cbp) | - | - |
 | BIOMD0000000590 | dho | dho | (S)-dihydroorotate (dhor__S) | - | - |
 | BIOMD0000000725 | AHMDHP | AHMDHP | 2-amino-6-(hydroxymethyl)-7,8-dihydropteridin-4-ol (2ahhmp) | - | - |
@@ -114,15 +114,15 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000090 | Ho | Ho | hydron (h) | water (h2o) | likely |
 | BIOMD0000000260 | s3 | iron_in_RBC | iron (fe3) / iron (fe2) | calcium (ca2) | uncertain |
 | BIOMD0000000470 | s_0075 | 1,2-dihexadecanoyl-sn-glycerol 3-phosphate | 1,2-dimyrsitoylphosphatidate (pa140) | 1,2-dihexadecanoyl-sn-glycerol-3-phosphate (pa160) | likely |
-| BIOMD0000000470 | s_0446 | alpha-D-Ribose 5-phosphate | D-ribofuranose 5-phosphate (r5p) | alpha-D-ribofuranose 5-phosphate (ar5p) | likely |
+| BIOMD0000000470 | s_0446 | alpha-D-Ribose 5-phosphate | D-ribose 5-phosphate (r5p) | alpha-D-ribose 5-phosphate (ar5p) | likely |
 | BIOMD0000000470 | s_0654 | D-Glucosamine 6-phosphate | alpha-D-glucosamine 6-phosphate (gam6p) | 2-ammonio-2-deoxy-D-glucopyranose 6-phosphate (gam6p_any) | likely |
 | BIOMD0000000470 | s_0979 | Hexadecenoyl-CoA (n-C16:1CoA) | (E)-hexadec-2-enoyl-CoA (hdd2coa) | palmitoleoyl-CoA (hdcoa) | likely |
 | BIOMD0000000495 | mw73259e20_240e_4f3a_b2e0_9ca248658898 | SerE | D-serine (ser__D) / L-serine (ser__L) | O-acetyl-L-serine (acser) | uncertain |
-| BIOMD0000000495 | mwf166ad55_4ff0_49fb_95d2_b657ad7653d5 | PE | 1,2-distearoylphosphatidylethanolamine (pe180) / PE(18:1(11Z)/18:1(9Z)) (pe18111Z1819Z) / 1,2-dihexadecanoyl-sn-glycero-3-phosphoethanolamine (pe160) | O-phosphonatoethanaminium (ethamp) | likely |
-| BIOMD0000000510 | Rib_g | Rib_g | D-ribofuranose (rib__D) | 2-deoxy-D-ribofuranose (drib) | uncertain |
-| BIOMD0000000515 | Rib5P_g | Rib5P_g | D-ribofuranose (rib__D) | aldehydo-D-arabinose 5-phosphate (ara5p) | uncertain |
+| BIOMD0000000495 | mwf166ad55_4ff0_49fb_95d2_b657ad7653d5 | PE | 1,2-distearoylphosphatidylethanolamine (pe180) / PE(18:1(11Z)/18:1(9Z)) (pe18111Z1819Z) / 1,2-dihexadecanoyl-sn-glycero-3-phosphoethanolamine (pe160) | O-phosphoethanaminium (ethamp) | likely |
+| BIOMD0000000510 | Rib_g | Rib_g | D-ribose (rib__D) | 2-deoxy-D-ribose (drib) | uncertain |
+| BIOMD0000000515 | Rib5P_g | Rib5P_g | D-ribose (rib__D) | aldehydo-D-arabinose 5-phosphate (ara5p) | uncertain |
 | BIOMD0000000560 | ROS |  | peroxynitrite (CE5643) / superoxide (o2s) / hypochlorous acid (CE4633) / hydrogen peroxide (h2o2) | 2-oxoglutarate (akg) | uncertain |
-| BIOMD0000000565 | cf6p | Fructose-6-Phosphate | D-fructofuranose 6-phosphate (f6p_any) | beta-D-fructofuranose 6-phosphate (f6p) | high |
+| BIOMD0000000565 | cf6p | Fructose-6-Phosphate | D-fructose 6-phosphate (f6p_any) | beta-D-fructose 6-phosphate (f6p) | high |
 | BIOMD0000000565 | cg6p | Glucose-6-Phosphate | D-glucose 6-phosphate (g6p_any) | alpha-D-glucose 6-phosphate (g6p_A) | high |
 | BIOMD0000000575 | Neuromelanin | Neuromelanin | 5,6-dihydroxyindole (CE4888) | 3-sulfino-L-alanine (3sala) | uncertain |
 | BIOMD0000000590 | ca | ca | N-carbamoyl-L-aspartate (cbasp) | calcium (ca2) | high |
@@ -135,17 +135,17 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000805 | Le | Le | (R)-lactate (lac__D) / (S)-lactate (lac__L) | 3-iodo-L-tyrosine (3ityr__L) | uncertain |
 | BIOMD0000000805 | Li | Li | (R)-lactate (lac__D) / (S)-lactate (lac__L) | 3,5-diiodo-L-tyrosinate (35diotyr) | uncertain |
 | BIOMD0000000890 | c | c | cholesterol (chsterol) | calcium (ca2) | likely |
-| BIOMD0000001055 | Fructose_6_Phosphate | Fructose-6-Phosphate | D-fructofuranose 6-phosphate (f6p_any) | beta-D-fructofuranose 6-phosphate (f6p) | high |
+| BIOMD0000001055 | Fructose_6_Phosphate | Fructose-6-Phosphate | D-fructose 6-phosphate (f6p_any) | beta-D-fructose 6-phosphate (f6p) | high |
 
 ### Right answer ranked lower (first 22 of 22)
 
 | Model | Id | Name | Annotated as | First suggestion | Level |
 |---|---|---|---|---|---|
-| BIOMD0000000015 | R5P | ribose-5-phosphate | D-ribofuranose 5-phosphate (r5p) | alpha-D-ribofuranose 5-phosphate (ar5p) (right one at 2) | likely |
-| BIOMD0000000050 | Glu |  | D-glucopyranose (glc__D) | L-glutamate (glu__L) (right one at 2) | likely |
-| BIOMD0000000070 | Rib5P | Ribose 5-phosphate | D-ribofuranose 5-phosphate (r5p) | alpha-D-ribofuranose 5-phosphate (ar5p) (right one at 2) | likely |
-| BIOMD0000000380 | glc | glucose | alpha-D-glucose (glc__aD) | D-glucopyranose (glc__D) (right one at 2) | likely |
-| BIOMD0000000380 | glx | glucose | alpha-D-glucose (glc__aD) | D-glucopyranose (glc__D) (right one at 2) | likely |
+| BIOMD0000000015 | R5P | ribose-5-phosphate | D-ribose 5-phosphate (r5p) | alpha-D-ribose 5-phosphate (ar5p) (right one at 2) | likely |
+| BIOMD0000000050 | Glu |  | D-glucose (glc__D) | L-glutamate (glu__L) (right one at 2) | likely |
+| BIOMD0000000070 | Rib5P | Ribose 5-phosphate | D-ribose 5-phosphate (r5p) | alpha-D-ribose 5-phosphate (ar5p) (right one at 2) | likely |
+| BIOMD0000000380 | glc | glucose | alpha-D-glucose (glc__aD) | D-glucose (glc__D) (right one at 2) | likely |
+| BIOMD0000000380 | glx | glucose | alpha-D-glucose (glc__aD) | D-glucose (glc__D) (right one at 2) | likely |
 | BIOMD0000000470 | s_0032 | (R)-Pantoate | pantoic acid (pant) | (R)-pantoate (pant__R) (right one at 2) | likely |
 | BIOMD0000000470 | s_0121 | 1-hexadecanoyl-sn-glycerol 3-phosphate | 1-acyl-sn-glycerol 3-phosphate (HC02042) | 1-palmitoyl-sn-glycerol 3-phosphate (1hdecg3p) (right one at 2) | likely |
 | BIOMD0000000470 | s_0255 | 3,4-dihydroxy-2-butanone 4-phosphate | 2-hydroxy-3-oxobutyl phosphate (db4p_any) | (2S)-2-hydroxy-3-oxobutyl phosphate (db4p) (right one at 2) | likely |
@@ -160,7 +160,7 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000050 | Gly |  | glycine (gly) | glycerol (glyc) (right one at 3) | likely |
 | BIOMD0000000725 | Gly | Gly | glycine (gly) | glycerol (glyc) (right one at 3) | likely |
 | BIOMD0000001005 | NAM | NAM | nicotinamide (ncam) | nicotinate D-ribonucleotide (nicrnt) (right one at 4) | uncertain |
-| BIOMD0000000495 | mw8796c919_9251_4970_8f87_0bca9ecfeb5c | Etn | ethanolaminium (etha) | sphinganine 1-phosphate (sph1p) (right one at 5) | uncertain |
+| BIOMD0000000495 | mw8796c919_9251_4970_8f87_0bca9ecfeb5c | Etn | ethanolamine (etha) | sphinganine 1-phosphate (sph1p) (right one at 5) | uncertain |
 | BIOMD0000000505 | NADHMAT |  | NADH (nadh) | acetoacetate (acac) (right one at 5) | likely |
 | BIOMD0000000495 | mwcb834e43_dc57_45ae_9452_f4c10955caf1 | PCho | choline phosphate (cholp) | sphinganine 1-phosphate (sph1p) (right one at 6) | uncertain |
 
@@ -205,7 +205,7 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000080 | Reaction_6 | Hydrolysis of GTP to GDP | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | phytoene synthase (PSY) | uncertain |
 | BIOMD0000000085 | reaction_20 | RG*AT hydrolysis | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | aspartase racemase (ASPR) | uncertain |
 | BIOMD0000000085 | reaction_3 | G*T  hydrolysis | nucleoside-triphosphatase (GTP) (NTP3) / nucleoside-triphosphatase (GTP) (periplasm) (NTP3pp) / nucleoside-triphosphatase (GTP) (NTP3e) | Conversion of CHEBI:15903 to CHEBI:4167, because one is an instance of the other (GALM1) | uncertain |
-| BIOMD0000000450 | V_CTGL | V_CTGL | gamma-glutamylcysteine synthetase (GLUCYS) / gamma-Glutamylcysteine synthase (GCL) | L-cysteine + O-phosphonato-L-homoserine = L-cystathionine (CYSTS_1) | likely |
+| BIOMD0000000450 | V_CTGL | V_CTGL | gamma-glutamylcysteine synthetase (GLUCYS) / gamma-Glutamylcysteine synthase (GCL) | L-cysteine + O-phospho-L-homoserine = L-cystathionine (CYSTS_1) | likely |
 | BIOMD0000000450 | V_MTHFR | V_MTHFR | methylenetetrahydrofolate dehydrogenase (NADP) (MTHFD) / methylenetetrahydrofolate dehydrogenase (NADP) mitochondrial (MTHFDm) | (6R)-5,10-methylenetetrahydrofolate = (6S)-5-methyltetrahydrofolate (MTHFR) | likely |
 | BIOMD0000000470 | r_0664 | glucose-6-phosphate isomerase | alpha-D-Glucose 6-phosphate ketol-isomerase (PGI1) / alpha-D-Glucose 6-phosphate ketol-isomerase (PGI1c) | glucose-6-phosphate isomerase (PGI) | likely |
 | BIOMD0000000470 | r_1962 | NAD(P) transhydrogenase (periplasm) | NAD transhydrogenase (NADTRHD) / NADPH:NAD+ oxidoreductase (NNOR) | NAD(P) transhydrogenase (periplasm) (THD2pp) | high |

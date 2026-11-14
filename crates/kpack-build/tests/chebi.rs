@@ -56,8 +56,9 @@ fn chebi_synonyms_find_bigg_entities() {
     let hit = &p.entities_named("dextrose")[0];
     assert_eq!(hit.kind, NameKind::Synonym);
     assert!(hit.sources.contains(Sources::CHEBI));
-    // The BiGG label is kept.
-    assert_eq!(p.str(p.entity(glc).label), "D-glucopyranose");
+    // BiGG's label, the ring form, gives way to the everyday name, which
+    // the sources also give it.
+    assert_eq!(p.str(p.entity(glc).label), "D-glucose");
 }
 
 #[test]
@@ -143,8 +144,10 @@ fn familiar_names_become_synonyms() {
     let glc = entity(&p, "glc__D");
     let e = p.entity(glc);
     let synonyms: Vec<&str> = e.synonyms.iter().map(|s| p.str(*s)).collect();
-    // BiGG calls it D-glucopyranose; people know it as D-glucose.
-    assert!(synonyms.iter().any(|s| s.eq_ignore_ascii_case("D-glucose")), "{synonyms:?}");
+    // Labelled D-glucose (BiGG says D-glucopyranose, which stays a
+    // synonym), and known as glucose.
+    assert!(synonyms.iter().any(|s| s.eq_ignore_ascii_case("D-glucopyranose")), "{synonyms:?}");
+    assert!(synonyms.iter().any(|s| s.eq_ignore_ascii_case("glucose")), "{synonyms:?}");
     // Not the label again, no brand names, at most a handful.
     assert!(!synonyms.iter().any(|s| kpack::normalize_name(s) == kpack::normalize_name(p.str(e.label))));
     assert!(!synonyms.contains(&"Rapilose"));

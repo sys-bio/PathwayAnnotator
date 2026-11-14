@@ -29,3 +29,4 @@ date	pack_built	set	models	providers	species_graded	species_top1	species_top3	sp
 2026-11-14	2026-11-14	test	215	names+decoder+context	1267	91.9%	93.4%	96.4%	95.3%	641	82.1%	84.4%	90.0%	91.2%	133	90.8%	82.7%
 2026-11-14	2026-11-14	test	215	names+decoder+context	1267	91.9%	93.4%	96.4%	95.3%	641	82.1%	84.4%	90.0%	91.2%	133	90.8%	82.7%
 2026-11-14	2026-11-14	test	215	names+decoder+context	1267	91.9%	93.4%	96.4%	95.3%	641	82.1%	84.4%	90.0%	91.2%	133	90.8%	82.7%
+2026-11-14	2026-11-14	test	215	names+decoder+context	1267	91.9%	93.4%	96.4%	95.3%	641	82.1%	84.4%	90.0%	91.2%	133	90.8%	82.7%
