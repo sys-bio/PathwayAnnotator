@@ -146,6 +146,22 @@ impl Workspace {
         Ok(uris)
     }
 
+    /// Accepts an entry found outside the pack (a ChEBI, UniProt or Rhea
+    /// URI): adds it as a `bqbiol:is` term and, if the element has no SBO
+    /// term and the document can carry one, sets `sbo`. One undoable edit.
+    pub fn accept_uri(&mut self, el: Element, uri: &str, sbo: Option<u32>) -> Result<(), EditError> {
+        let mut meta = self.with_terms(el, |terms| add(terms, "is", &[uri.to_string()]))?;
+        let sbo_allowed = !(self.doc.level == 2 && self.doc.version == 1);
+        if let Some(n) = sbo
+            && meta.sbo_term.is_none()
+            && sbo_allowed
+        {
+            meta.sbo_term = Some(format!("SBO:{n:07}"));
+        }
+        self.apply(el, meta);
+        Ok(())
+    }
+
     /// Replaces what an element is identified as: removes its `bqbiol:is`
     /// and `isVersionOf` terms that lead to anything in the pack, then
     /// accepts `target` as [`Workspace::accept`] does. Terms the pack does

@@ -7,6 +7,7 @@ members = [
     "crates/kpack-build",
     "crates/annot-engine",
     "crates/annot-model",
+    "crates/annot-online",
     "crates/annot-cli",
     "crates/annot-app",
 ]

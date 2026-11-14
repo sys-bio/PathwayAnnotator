@@ -23,6 +23,7 @@ version = "0.1.0"
 dependencies = [
  "annot-engine",
  "annot-model",
+ "annot-online",
  "console_error_panic_hook",
  "js-sys",
  "kpack",
@@ -62,6 +63,15 @@ dependencies = [
  "kpack",
  "kpack-build",
  "sbml-io",
+]
+
+[[package]]
+name = "annot-online"
+version = "0.1.0"
+dependencies = [
+ "kpack",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

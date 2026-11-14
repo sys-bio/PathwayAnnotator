@@ -1,0 +1,6 @@
+Entry	Protein names	Organism	Gene Names (primary)	EC number
+Q01813	ATP-dependent 6-phosphofructokinase, platelet type (ATP-PFK) (PFK-P) (EC 2.7.1.11) (6-phosphofructokinase type C) (Phosphofructo-1-kinase isozyme C) (PFK-C) (Phosphohexokinase)	Homo sapiens (Human)	PFKP	2.7.1.11
+P08237	ATP-dependent 6-phosphofructokinase, muscle type (ATP-PFK) (PFK-M) (EC 2.7.1.11) (6-phosphofructokinase type A) (Phosphofructo-1-kinase isozyme A) (PFK-A) (Phosphohexokinase)	Homo sapiens (Human)	PFKM	2.7.1.11
+P17858	ATP-dependent 6-phosphofructokinase, liver type (ATP-PFK) (PFK-L) (EC 2.7.1.11) (6-phosphofructokinase type B) (Phosphofructo-1-kinase isozyme B) (PFK-B) (Phosphohexokinase)	Homo sapiens (Human)	PFKL	2.7.1.11
+P90521	ATP-dependent 6-phosphofructokinase (ATP-PFK) (Phosphofructokinase) (EC 2.7.1.11) (Phosphohexokinase)	Dictyostelium discoideum (Social amoeba)	pfkA	2.7.1.11
+P52034	ATP-dependent 6-phosphofructokinase (ATP-PFK) (Phosphofructokinase) (EC 2.7.1.11) (Phosphohexokinase)	Drosophila melanogaster (Fruit fly)	Pfk	2.7.1.11

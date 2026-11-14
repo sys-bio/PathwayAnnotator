@@ -1,0 +1,12 @@
+[package]
+name = "annot-online"
+description = "Searching public databases (ChEBI via OLS, UniProt, Rhea) for elements the knowledge pack does not know: queries, response parsing and ranking. No networking: the caller fetches."
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+kpack = { path = "../kpack" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"

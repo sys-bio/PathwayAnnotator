@@ -4,17 +4,19 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use annot_engine::{Candidate, Confidence, Model, Suggestions, annotate, confidence};
+use annot_engine::{Candidate, Confidence, Model, Role, Suggestions, annotate, confidence};
 use annot_model::{Element, Resolution, Workspace};
-use kpack::{Pack, Target};
+use kpack::{EntityFlags, Pack, Target, XrefScope};
 
 /// Where an element stands.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Status {
     /// Already annotated with something in the pack.
     Identified { label: String },
-    /// Annotated, but with nothing in our database (often a protein).
-    AnnotatedElsewhere,
+    /// Annotated, but with nothing in our database (often a protein). The
+    /// label is known when the user picked it from a search of other
+    /// databases this session.
+    AnnotatedElsewhere { label: Option<String> },
     /// Not annotated; the engine has a suggestion.
     Suggested { label: String, level: Confidence },
     /// Not annotated, no suggestion.
@@ -25,7 +27,7 @@ impl Status {
     /// A CSS class for the status.
     pub fn class(&self) -> &'static str {
         match self {
-            Status::Identified { .. } | Status::AnnotatedElsewhere => "done",
+            Status::Identified { .. } | Status::AnnotatedElsewhere { .. } => "done",
             Status::Suggested { level: Confidence::High, .. } => "high",
             Status::Suggested { level: Confidence::Likely, .. } => "likely",
             Status::Suggested { level: Confidence::Uncertain, .. } => "uncertain",
@@ -73,6 +75,12 @@ pub struct Session {
     /// Suggestions the user rejected, per element. Kept for the session
     /// only: they are not written into the model.
     rejected: BTreeMap<Element, Vec<Target>>,
+    /// What entries accepted from a search of other databases are called,
+    /// by URI, so the list can say "fructose 6-phosphate (ChEBI ...)"
+    /// rather than "annotated elsewhere".
+    online_labels: BTreeMap<String, String>,
+    /// The same entries' plain names ("keto-D-fructose 6-phosphate").
+    online_names: BTreeMap<String, String>,
 }
 
 impl Session {
@@ -87,6 +95,8 @@ impl Session {
             species_status: Vec::new(),
             reaction_status: Vec::new(),
             rejected: BTreeMap::new(),
+            online_labels: BTreeMap::new(),
+            online_names: BTreeMap::new(),
         };
         s.refresh();
         s
@@ -234,7 +244,9 @@ impl Session {
                     (None, _) => String::new(),
                 },
             },
-            Resolution::OutsidePack => Status::AnnotatedElsewhere,
+            Resolution::OutsidePack => Status::AnnotatedElsewhere {
+                label: self.ws.identity_uris(el).iter().find_map(|u| self.online_labels.get(u).cloned()),
+            },
             Resolution::Unannotated => {
                 let cands = self.candidates(el);
                 match (cands.first(), confidence(cands)) {
@@ -278,7 +290,7 @@ impl Session {
         };
         for el in elements {
             match self.status(*el) {
-                Status::Identified { .. } | Status::AnnotatedElsewhere => c.done += 1,
+                Status::Identified { .. } | Status::AnnotatedElsewhere { .. } => c.done += 1,
                 Status::Suggested { level: Confidence::High, .. } => c.high += 1,
                 Status::Suggested { level: Confidence::Likely, .. } => c.likely += 1,
                 Status::Suggested { level: Confidence::Uncertain, .. } => c.uncertain += 1,
@@ -415,7 +427,6 @@ impl Session {
         msg
     }
 
-    /// Accepts every high-confidence suggestion. Returns how many.
     /// Renames an element's SBML id, updating every reference to it.
     /// Returns a message for the user, or why it could not be done.
     pub fn rename(&mut self, el: Element, new_id: &str) -> Result<String, String> {
@@ -443,6 +454,118 @@ impl Session {
         let n = self.ws.batch(|ws| todo.iter().filter(|&&(el, t)| ws.accept(pack, el, t).is_ok()).count());
         self.refresh();
         n
+    }
+
+    /// The text to search other databases with: the element's name, else
+    /// its id made readable ("M_glc__D_c" -> "glc D").
+    pub fn search_text(&self, el: Element) -> String {
+        let name = match el {
+            Element::Species(i) => self.model.species[i].name.clone(),
+            Element::Reaction(i) => self.model.reactions[i].name.clone(),
+            _ => None,
+        };
+        name.filter(|n| !n.trim().is_empty())
+            .unwrap_or_else(|| annot_online::query_from_id(self.ws.element_id(el)))
+    }
+
+    /// A species' ChEBI ids, every charge form, if it is identified (in
+    /// the pack, or with a ChEBI URI the pack does not know).
+    fn chebi_ids(&self, species: Element) -> Vec<String> {
+        let mut ids = Vec::new();
+        for t in self.identified_as(species) {
+            if let Target::Entity(e) = t {
+                for x in self.pack.entity_xrefs(e, "chebi").filter(|x| x.scope == XrefScope::Exact && !x.secondary) {
+                    ids.push(self.pack.str(x.id).to_string());
+                }
+            }
+        }
+        for uri in self.ws.identity_uris(species) {
+            let uri = uri.replace("%3A", ":");
+            if let Some(i) = uri.find("CHEBI:") {
+                let id: String = uri[i..].chars().take_while(|c| *c != '/' && *c != '#').collect();
+                ids.push(id);
+            }
+        }
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+
+    /// Whether a species is water, a proton, ATP or the like: by what it
+    /// is identified as, else by the engine's first suggestion.
+    fn is_currency(&self, species: Element) -> bool {
+        let currency = |t: &Target| matches!(t, Target::Entity(e) if self.pack.entity(*e).flags.contains(EntityFlags::CURRENCY));
+        let known = self.identified_as(species);
+        if !known.is_empty() {
+            return known.iter().any(currency);
+        }
+        self.candidates(species).first().is_some_and(|c| currency(&c.target))
+    }
+
+    /// A reaction's molecules, as a Rhea search needs them.
+    pub fn rhea_participants(&self, reaction: Element) -> Vec<annot_online::Participant> {
+        let Element::Reaction(i) = reaction else { return Vec::new() };
+        self.model.reactions[i]
+            .participants
+            .iter()
+            .filter(|p| p.role != Role::Modifier)
+            .map(|p| {
+                let sp = Element::Species(p.species);
+                annot_online::Participant {
+                    name: self.search_text(sp),
+                    label: self.identified_name(sp),
+                    chebi: self.chebi_ids(sp),
+                    product: p.role == Role::Product,
+                    currency: self.is_currency(sp),
+                }
+            })
+            .collect()
+    }
+
+    /// What a species is identified as, in words: the pack's label, or the
+    /// name of an entry accepted from another database this session.
+    fn identified_name(&self, species: Element) -> Option<String> {
+        if let Some(t) = self.representative(&self.identified_as(species)) {
+            return Some(self.label(t));
+        }
+        self.ws.identity_uris(species).iter().find_map(|u| self.online_names.get(u).cloned())
+    }
+
+    /// Whether a ChEBI id is a currency molecule in the pack.
+    pub fn chebi_is_currency(&self, id: &str) -> bool {
+        self.pack
+            .find_resource(&format!("https://identifiers.org/{id}"))
+            .iter()
+            .any(|(t, _)| matches!(t, Target::Entity(e) if self.pack.entity(*e).flags.contains(EntityFlags::CURRENCY)))
+    }
+
+    /// Accepts an entry found in another database. If the pack knows it,
+    /// this is the same as accepting the pack's entry (replacing any other
+    /// identification); otherwise its URI and SBO term are added. Returns
+    /// a message for the user.
+    pub fn accept_online(&mut self, el: Element, hit: &annot_online::Hit) -> String {
+        let name = self.display_name(el);
+        let in_pack = self
+            .pack
+            .find_resource(&hit.uri)
+            .into_iter()
+            .filter(|(_, scope)| *scope == XrefScope::Exact)
+            .map(|(t, _)| t)
+            .find(|t| matches!((t, el), (Target::Entity(_), Element::Species(_)) | (Target::Reaction(_), Element::Reaction(_))));
+        if let Some(target) = in_pack {
+            return self.accept(el, target);
+        }
+        let what = format!("{} ({} {})", hit.label, hit.db.label(), hit.id);
+        let msg = match self.ws.accept_uri(el, &hit.uri, Some(hit.db.sbo())) {
+            Ok(()) => {
+                self.online_labels.insert(hit.uri.clone(), what.clone());
+                self.online_names.insert(hit.uri.clone(), hit.label.clone());
+                format!("{name} annotated as {what}.")
+            }
+            Err(e) => format!("Could not annotate {name}: {e}."),
+        };
+        self.refresh();
+        msg
     }
 
     /// The file name for the annotated model: "model.xml" -> "model-annotated.xml".

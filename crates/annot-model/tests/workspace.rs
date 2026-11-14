@@ -277,3 +277,23 @@ fn antimony_models_load_and_annotate() {
     let again = load(&w.to_sbml()).unwrap();
     assert!(!again.identity_uris(Element::Species(1)).is_empty());
 }
+
+#[test]
+fn accepting_an_entry_from_another_database() {
+    let mut w = load(MODEL).unwrap();
+    let before = w.to_sbml();
+    let uri = "https://identifiers.org/uniprot:P08237";
+    w.accept_uri(Element::Species(1), uri, Some(252)).unwrap();
+    assert_eq!(w.identity_uris(Element::Species(1)), [uri]);
+    assert!(w.to_sbml().contains("SBO:0000252"));
+    // An SBO term already there is kept.
+    w.accept_uri(Element::Species(0), "https://identifiers.org/CHEBI:88003", Some(247)).unwrap();
+    w.set_sbo(Element::Reaction(0), Some(176)).unwrap();
+    w.accept_uri(Element::Reaction(0), "https://identifiers.org/rhea:11816", Some(252)).unwrap();
+    assert!(w.to_sbml().contains("SBO:0000176") && !w.to_sbml().contains("sboTerm=\"SBO:0000252\" id=\"J1\""));
+    // One undo step each.
+    for _ in 0..4 {
+        assert!(w.undo());
+    }
+    assert_eq!(w.to_sbml(), before);
+}

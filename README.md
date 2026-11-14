@@ -37,6 +37,7 @@ the time.
 | `kpack-build` | Builds the pack from BiGG, ChEBI and BioModels (native) |
 | `annot-engine` | The suggestion engine, its providers and confidence levels (WebAssembly) |
 | `annot-model` | Loads SBML/Antimony, applies accepted annotations with undo, writes SBML (WebAssembly) |
+| `annot-online` | Searches ChEBI (via OLS), UniProt and Rhea for what the pack does not know (WebAssembly; the app fetches) |
 | `annot-cli` | The benchmark, later batch annotation (native) |
 | `annot-app` | The browser app (Leptos, built with Trunk) |
 | `sbml-io`, `antimony` | SBML and Antimony reading and writing |
@@ -80,3 +81,10 @@ The knowledge pack is built from:
 
 Each pack records its sources, versions and required notices in its
 header.
+
+When the user asks (Details, "Search other databases"), the app also
+searches [ChEBI](https://www.ebi.ac.uk/chebi) through EBI's
+[Ontology Lookup Service](https://www.ebi.ac.uk/ols4),
+[UniProt](https://www.uniprot.org) and [Rhea](https://www.rhea-db.org)
+(all CC BY 4.0). The search text is sent to those services; nothing is
+sent otherwise.

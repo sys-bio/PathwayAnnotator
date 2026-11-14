@@ -1,0 +1,12 @@
+Reaction identifier	Equation	ChEBI identifier	EC number
+RHEA:10772	6-phospho-beta-D-glucosyl-(1->4)-D-glucose + H2O = D-glucose 6-phosphate + D-glucose	CHEBI:58312;CHEBI:15377;CHEBI:61548;CHEBI:4167	EC:3.2.1.86
+RHEA:11460	D-glucose + ADP = D-glucose 6-phosphate + AMP + H(+)	CHEBI:4167;CHEBI:456216;CHEBI:61548;CHEBI:456215;CHEBI:15378	EC:2.7.1.147
+RHEA:16689	D-glucose 6-phosphate + H2O = D-glucose + phosphate	CHEBI:61548;CHEBI:15377;CHEBI:4167;CHEBI:43474	EC:3.1.3.9;EC:3.1.3.58
+RHEA:17825	D-glucose + ATP = D-glucose 6-phosphate + ADP + H(+)	CHEBI:4167;CHEBI:30616;CHEBI:61548;CHEBI:456216;CHEBI:15378	EC:2.7.1.1;EC:2.7.1.2
+RHEA:20421	alpha-maltose 6'-phosphate + H2O = D-glucose 6-phosphate + D-glucose	CHEBI:57478;CHEBI:15377;CHEBI:61548;CHEBI:4167	EC:3.2.1.122
+RHEA:21288	sn-glycerol 3-phosphate + D-glucose = D-glucose 6-phosphate + glycerol	CHEBI:57597;CHEBI:4167;CHEBI:61548;CHEBI:17754	EC:2.7.1.142
+RHEA:22036	[phosphate](n) + D-glucose = [phosphate](n-1) + D-glucose 6-phosphate + H(+)	CHEBI:16838;CHEBI:4167;CHEBI:61548;CHEBI:15378	EC:2.7.1.63
+RHEA:23008	alpha,alpha-trehalose 6-phosphate + H2O = D-glucose 6-phosphate + D-glucose	CHEBI:58429;CHEBI:15377;CHEBI:61548;CHEBI:4167	EC:3.2.1.93
+RHEA:33367	N(pros)-phospho-L-histidyl-[protein] + D-glucose(out) = D-glucose 6-phosphate(in) + L-histidyl-[protein]	CHEBI:64837;CHEBI:4167;CHEBI:61548;CHEBI:29979	EC:2.7.1.199
+RHEA:36495	alpha-D-glucose + ATP = alpha-D-glucose 6-phosphate + ADP + H(+)	CHEBI:17925;CHEBI:30616;CHEBI:58225;CHEBI:456216;CHEBI:15378	
+RHEA:44904	alpha-D-glucose 6-phosphate + H2O = alpha-D-glucose + phosphate	CHEBI:58225;CHEBI:15377;CHEBI:17925;CHEBI:43474	EC:3.1.3.9;EC:3.1.3.58

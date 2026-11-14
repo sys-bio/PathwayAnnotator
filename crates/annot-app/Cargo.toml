@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 annot-engine = { path = "../annot-engine" }
 annot-model = { path = "../annot-model" }
+annot-online = { path = "../annot-online" }
 console_error_panic_hook = "0.1.7"
 js-sys = "0.3.107"
 kpack = { path = "../kpack" }

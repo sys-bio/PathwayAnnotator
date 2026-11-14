@@ -35,7 +35,7 @@ impl Filter {
         match self {
             Filter::All => true,
             Filter::Review => matches!(s, Status::Suggested { .. }),
-            Filter::Done => matches!(s, Status::Identified { .. } | Status::AnnotatedElsewhere),
+            Filter::Done => matches!(s, Status::Identified { .. } | Status::AnnotatedElsewhere { .. }),
             Filter::Nothing => matches!(s, Status::Unknown),
         }
     }
@@ -494,7 +494,10 @@ fn Item(el: Element) -> impl IntoView {
             <span class="what">"Identified as " {check_link(label, identity_link())}</span>
         }
             .into_any(),
-        Status::AnnotatedElsewhere => {
+        Status::AnnotatedElsewhere { label: Some(label) } => {
+            view! { <span class="what">"Identified as " {check_link(label, identity_link())}</span> }.into_any()
+        }
+        Status::AnnotatedElsewhere { label: None } => {
             view! { <span class="what">"Annotated (with something outside our database)"</span> }.into_any()
         }
         Status::Suggested { label, level } => view! {
@@ -511,7 +514,9 @@ fn Item(el: Element) -> impl IntoView {
             </button>
         }
             .into_any(),
-        Status::Unknown => view! { <span class="what muted">"No suggestion"</span> }.into_any(),
+        Status::Unknown => {
+            view! { <span class="what muted">"No suggestion: search other databases in Details"</span> }.into_any()
+        }
     };
     view! {
         <li class="item" class:open=open id=dom_id(el)>
@@ -654,7 +659,12 @@ fn Chip(reaction: Element, position: usize, species: Element, label: String, cla
         let Some(i) = info() else { return ().into_any() };
         let status = match &i.status {
             Status::Identified { label } => view! { <p>"Identified as " <b>{label.clone()}</b></p> }.into_any(),
-            Status::AnnotatedElsewhere => view! { <p>"Annotated with something outside our database"</p> }.into_any(),
+            Status::AnnotatedElsewhere { label: Some(label) } => {
+                view! { <p>"Identified as " <b>{label.clone()}</b></p> }.into_any()
+            }
+            Status::AnnotatedElsewhere { label: None } => {
+                view! { <p>"Annotated with something outside our database"</p> }.into_any()
+            }
             Status::Suggested { label, level } => view! {
                 <p>
                     "Suggested: " <b>{label.clone()}</b>
@@ -836,6 +846,272 @@ fn RenameId(el: Element) -> impl IntoView {
     }
 }
 
+/// How many proteins to show when none has exactly the name searched for.
+const PROTEINS_SHOWN: usize = 3;
+
+/// What a search of other databases has come to.
+#[derive(Clone)]
+enum Found {
+    Searching,
+    /// The entries, best first, and anything that went wrong (one service
+    /// failing does not hide the other's answer).
+    Done {
+        hits: Vec<annot_online::Hit>,
+        problems: Vec<String>,
+        /// A note on how the search went ("no reaction has all of them").
+        note: Option<String>,
+    },
+}
+
+/// Searching databases beyond the knowledge base, for a molecule or
+/// reaction the annotator knows nothing (or not enough) about: ChEBI and
+/// UniProt for a molecule, Rhea for a reaction. Nothing is sent anywhere
+/// until the user presses Search; what is sent, and to whom, is said
+/// beside the button.
+#[component]
+fn OnlineSearch(el: Element) -> impl IntoView {
+    use annot_online::{Db, RheaQuery};
+    let ctx = expect_context::<Ctx>();
+    let s = ctx.session;
+    let reaction = matches!(el, Element::Reaction(_));
+    let text = RwSignal::new(s.with_untracked(|s| s.as_ref().map(|s| s.search_text(el)).unwrap_or_default()));
+    let found = RwSignal::new(None::<Found>);
+    // For a reaction: its molecules, and which are identified (the search
+    // uses their ChEBI ids, else their names).
+    let parts = move || s.with(|s| s.as_ref().map(|s| s.rhea_participants(el)).unwrap_or_default());
+
+    let search_molecule = move || {
+        let q = text.get_untracked().trim().to_string();
+        if q.is_empty() {
+            return;
+        }
+        found.set(Some(Found::Searching));
+        spawn_local(async move {
+            let mut hits = Vec::new();
+            let mut problems = Vec::new();
+            match browser::fetch_text(&annot_online::chebi_url(&q)).await.and_then(|j| annot_online::parse_chebi(&j, &q)) {
+                Ok(mut h) => {
+                    annot_online::exact_first(&mut h);
+                    hits.extend(h);
+                }
+                Err(e) => problems.push(format!("ChEBI: {e}")),
+            }
+            let mut note = None;
+            match browser::fetch_text(&annot_online::uniprot_url(&q, None))
+                .await
+                .and_then(|t| annot_online::parse_uniprot(&t, &q))
+            {
+                Ok(mut h) => {
+                    annot_online::exact_first(&mut h);
+                    // Proteins that only mention the words (a molecule's
+                    // name in an enzyme's) are noise: a few at most.
+                    if !h.iter().any(|h| h.exact) && h.len() > PROTEINS_SHOWN {
+                        h.truncate(PROTEINS_SHOWN);
+                        note = Some(format!(
+                            "No protein has exactly this name; showing the first {PROTEINS_SHOWN} UniProt finds."
+                        ));
+                    }
+                    hits.extend(h);
+                }
+                Err(e) => problems.push(format!("UniProt: {e}")),
+            }
+            found.set(Some(Found::Done { hits, problems, note }));
+        });
+    };
+    let search_reaction = move || {
+        let parts = parts();
+        let Some(query) = RheaQuery::for_reaction(&parts) else {
+            found.set(Some(Found::Done {
+                hits: Vec::new(),
+                problems: vec!["This reaction has no molecules to search by.".into()],
+                note: None,
+            }));
+            return;
+        };
+        found.set(Some(Found::Searching));
+        spawn_local(async move {
+            let ranked = |q: annot_online::RheaQuery| {
+                let parts = parts.clone();
+                async move {
+                    let tsv = browser::fetch_text(&annot_online::rhea_url(&q)).await?;
+                    s.with_untracked(|s| match s {
+                        Some(s) => annot_online::rank_rhea(&tsv, &parts, |id| s.chebi_is_currency(id)),
+                        None => Ok(Vec::new()),
+                    })
+                }
+            };
+            let mut note = None;
+            let mut result = ranked(query.clone()).await;
+            // Nothing has all of them: one may be identified with an entry
+            // Rhea does not use. Try leaving each out in turn.
+            if matches!(&result, Ok(h) if h.is_empty()) && !query.relaxed().is_empty() {
+                let mut lists = Vec::new();
+                for q in query.relaxed() {
+                    match ranked(q).await {
+                        Ok(h) => lists.push(h),
+                        Err(e) => {
+                            result = Err(e);
+                            break;
+                        }
+                    }
+                }
+                if result.is_ok() {
+                    note = Some("No Rhea reaction has all of these molecules; these have all but one.".to_string());
+                    result = Ok(annot_online::merge_ranked(lists));
+                }
+            }
+            found.set(Some(match result {
+                Ok(hits) => Found::Done { hits, problems: Vec::new(), note },
+                Err(e) => Found::Done { hits: Vec::new(), problems: vec![format!("Rhea: {e}")], note: None },
+            }));
+        });
+    };
+    let search = move || if reaction { search_reaction() } else { search_molecule() };
+
+    let form = move || {
+        if reaction {
+            let parts = parts();
+            let main: Vec<_> = parts.iter().filter(|p| !p.currency).cloned().collect();
+            let main = if main.is_empty() { parts } else { main };
+            let by_ids = main.iter().any(|p| !p.chebi.is_empty());
+            let listed = main
+                .iter()
+                .map(|p| {
+                    let known = !p.chebi.is_empty();
+                    view! {
+                        <span class="chip" class:done=known class:unknown=!known>
+                            {p.name.clone()}
+                        </span>
+                    }
+                })
+                .collect_view();
+            let how = if by_ids {
+                "Looks for Rhea reactions with every identified molecule (green), and ranks them by how well both sides fit."
+            } else {
+                "None of these molecules is identified yet, so Rhea is searched by their names. Identifying them first gives much better results."
+            };
+            view! {
+                <div class="online-form">
+                    <span class="muted">"Molecules: "</span>
+                    {listed}
+                    <button class="primary" on:click=move |_| search()>"Search Rhea"</button>
+                </div>
+                <p class="hint">{how} " Sends their ChEBI ids or names to " {Db::Rhea.host()} "."</p>
+            }
+                .into_any()
+        } else {
+            view! {
+                <div class="online-form">
+                    <label>
+                        <span class="muted">"Search for "</span>
+                        <input
+                            type="text"
+                            prop:value=move || text.get()
+                            on:input=move |ev| text.set(event_target_value(&ev))
+                            on:keydown=move |ev: web_sys::KeyboardEvent| {
+                                if ev.key() == "Enter" {
+                                    search();
+                                }
+                            }
+                        />
+                    </label>
+                    <button class="primary" on:click=move |_| search()>"Search ChEBI and UniProt"</button>
+                </div>
+                <p class="hint">
+                    "ChEBI has small molecules beyond the knowledge base; UniProt has proteins (enzymes, transporters). "
+                    "Sends the text to " {Db::Chebi.host()} " and " {Db::Uniprot.host()} "."
+                </p>
+            }
+                .into_any()
+        }
+    };
+
+    let results = move || {
+        let Some(f) = found.get() else { return ().into_any() };
+        let (hits, problems, note) = match f {
+            Found::Searching => return view! { <p class="muted" role="status">"Searching..."</p> }.into_any(),
+            Found::Done { hits, problems, note } => (hits, problems, note),
+        };
+        let current = s.with(|s| s.as_ref().map(|s| s.ws.identity_uris(el)).unwrap_or_default());
+        let nothing = hits.is_empty() && problems.is_empty();
+        let mut last_db = None;
+        let rows = hits
+            .into_iter()
+            .map(|h| {
+                let heading = (last_db != Some(h.db)).then(|| {
+                    let what = match h.db {
+                        Db::Chebi => "ChEBI: molecules",
+                        Db::Uniprot => "UniProt: proteins",
+                        Db::Rhea => "Rhea: reactions",
+                    };
+                    view! { <h5>{what}</h5> }
+                });
+                last_db = Some(h.db);
+                let accepted = current.contains(&h.uri);
+                let id = h.id.clone();
+                let uri = h.uri.clone();
+                let detail = h.detail.clone();
+                let why = h.why.clone();
+                let aka: Vec<String> = h.synonyms.iter().take(4).cloned().collect();
+                let label = h.label.clone();
+                let exact = h.exact;
+                let action = if accepted {
+                    view! { <span class="accepted" role="status">" Accepted"</span> }.into_any()
+                } else {
+                    view! {
+                        <button
+                            class="accept"
+                            title="Annotate the model with this entry"
+                            on:click=move |_| {
+                                s.update(|s| {
+                                    if let Some(s) = s {
+                                        let msg = s.accept_online(el, &h);
+                                        ctx.message.set(Some(msg));
+                                    }
+                                })
+                            }
+                        >
+                            "Accept"
+                        </button>
+                    }
+                        .into_any()
+                };
+                view! {
+                    {heading}
+                    <div class="cand online" class:is-accepted=accepted>
+                        <div class="cand-head">
+                            {check_link(label, Some(uri.clone()))}
+                            <span class="ids">
+                                <a href=uri target="_blank" rel="noopener noreferrer">{id}</a>
+                            </span>
+                            {exact.then(|| view! { <span class="badge high">{if reaction { "fits" } else { "same name" }}</span> })}
+                            {action}
+                        </div>
+                        {detail.map(|d| view! { <p class="muted detail">{d}</p> })}
+                        {(!aka.is_empty()).then(|| view! { <p class="aka-list">"Also known as: " {aka.join("; ")}</p> })}
+                        {why.map(|w| view! { <ul class="evidence"><li>{w}</li></ul> })}
+                    </div>
+                }
+            })
+            .collect_view();
+        view! {
+            {problems.into_iter().map(|p| view! { <p class="error" role="alert">{p}</p> }).collect_view()}
+            {nothing.then(|| view! { <p class="muted">"Nothing found. Try another name or spelling."</p> })}
+            {note.map(|n| view! { <p class="muted">{n}</p> })}
+            {rows}
+        }
+            .into_any()
+    };
+
+    view! {
+        <div class="online">
+            <h4>"Search other databases"</h4>
+            {form}
+            {results}
+        </div>
+    }
+}
+
 /// The candidates for an element, with their evidence, and its existing
 /// annotation.
 #[component]
@@ -976,6 +1252,7 @@ fn Details(el: Element) -> impl IntoView {
                     .collect_view()
                     .into_any()
             }}
+            <OnlineSearch el=el/>
             {move || {
                 let rejected = s.with(|s| s.as_ref().map(|s| s.rejected(el)).unwrap_or_default());
                 (!rejected.is_empty())

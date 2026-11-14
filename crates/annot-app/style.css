@@ -181,6 +181,15 @@ ul.items { list-style: none; margin: 0; padding: 0; }
 .chip-card-title { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .chip-card-actions { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-top: 6px; }
 
+/* Searching other databases (Details). */
+.online { margin-top: 12px; }
+.online-form { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.online-form input { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; min-width: 16em; }
+.online-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.online .hint { margin: 4px 0 8px; color: var(--muted); font-size: 13px; }
+.online h5 { margin: 10px 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.online .detail { margin: 2px 0; font-size: 13px; }
+
 /* The way back after jumping from a reaction to a molecule. */
 .back { position: sticky; top: 0; z-index: 10; padding: 6px 0; background: var(--bg); }
 .back button { display: inline-flex; align-items: center; gap: 2px; border-color: var(--accent); color: var(--accent); }

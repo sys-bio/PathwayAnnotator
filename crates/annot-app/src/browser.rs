@@ -26,6 +26,21 @@ pub async fn fetch_pack(url: &str) -> Result<kpack::Pack, String> {
     kpack::decode(&bytes).map_err(|e| e.to_string())
 }
 
+/// Fetches a URL's text: an answer from another database.
+pub async fn fetch_text(url: &str) -> Result<String, String> {
+    let window = web_sys::window().ok_or("no window")?;
+    let resp: web_sys::Response = JsFuture::from(window.fetch_with_str(url))
+        .await
+        .map_err(|_| "the service could not be reached (offline?)".to_string())?
+        .dyn_into()
+        .map_err(js_error)?;
+    if !resp.ok() {
+        return Err(format!("the service answered {}", resp.status()));
+    }
+    let text = JsFuture::from(resp.text().map_err(js_error)?).await.map_err(js_error)?;
+    text.as_string().ok_or_else(|| "the answer is not text".into())
+}
+
 /// The text of a file the user chose or dropped.
 pub async fn read_file(file: &web_sys::File) -> Result<String, String> {
     let text = JsFuture::from(file.text()).await.map_err(js_error)?;

@@ -36,6 +36,9 @@ Annotator/
     annot-engine/            inference: name decoder, candidate generation,
                              evidence providers, propagation, scoring, checks.
                              Depends on kpack + annot-model. WASM-safe.
+    annot-online/            searching ChEBI (via OLS), UniProt and Rhea for
+                             what the pack does not know: URLs, parsing,
+                             ranking. No network (the app fetches). WASM-safe.
     annot-app/               the UI (WASM, also runs natively for development).
     annot-cli/               native: batch annotation + benchmark harness.
   packs/                     built packs (git-ignored; published by CI)
@@ -48,7 +51,8 @@ Dependency graph (arrows = "depends on"):
   kpack-build --> kpack
   annot-engine --> kpack
   annot-model --> annot-engine, kpack, sbml-io, antimony-rs
-  annot-app --> annot-engine, annot-model, kpack
+  annot-online --> kpack
+  annot-app --> annot-engine, annot-model, annot-online, kpack
   annot-cli --> annot-engine, annot-model, kpack, kpack-build
 
 (Changed 2026-11-14: the engine has its own SBML-free input type,
@@ -59,7 +63,9 @@ depends on the engine rather than the other way round.)
 Rules:
 - `kpack`, `annot-model`, `annot-engine` do no I/O. The caller hands them bytes
   or strings. This keeps them WASM-safe and easy to test.
-- Only `kpack-build` and `annot-cli` touch the network or file system.
+- Only `kpack-build` and `annot-cli` touch the network or file system, and
+  the app, which fetches the pack and, when the user asks, searches other
+  databases (`annot-online` builds the requests and reads the answers).
 - `kpack` has minimal dependencies (serde, postcard, ruzstd).
 
 UI framework for `annot-app`: **Leptos** (client-side rendering, built with
@@ -661,11 +667,61 @@ Known issues / next (in order):
   when it would run off the right of the window (`place_card` in
   views.rs, measured in the frame the card appears, so it does not flash).
   The extra space below the list is gone.
-- No search for an element the engine has nothing for (OLS / UniProt),
-  no keyboard shortcuts, no SBO / qualifier editing in the UI yet.
+- Started (2026-11-14): searching other databases; see "Searching other
+  databases" below. No keyboard shortcuts, no SBO / qualifier editing in
+  the UI yet.
 - Publishing to GitHub Pages needs a CI job that builds the pack (BiGG,
   ChEBI and BioModels fetch, ~10 minutes) or a pack published as a release
   asset.
+
+## 5.4 Searching other databases (`annot-online`, 2026-11-14)
+
+For a molecule or reaction the pack knows nothing (or not enough) about,
+Details has "Search other databases". Nothing is sent until the user
+presses Search; beside the button the app says what is sent and to whom.
+All three services answer browsers directly (CORS `*`) and need no key.
+
+- Molecules: the search text (the element's name, else its id made
+  readable: "M_glc__D_c" -> "glc D"; editable) goes to all of ChEBI
+  through EBI's Ontology Lookup Service (OLS4, label and synonym fields)
+  and to reviewed UniProt entries (protein or gene name). Entries whose
+  name or a synonym is the search text (compared as the pack compares
+  names) come first and are marked "same name". When no protein has the
+  exact name only 3 UniProt entries are shown, with a note: proteins that
+  merely mention a molecule's name are noise.
+- Reactions: Rhea, by the reaction's main (non-currency) molecules. Each
+  identified molecule contributes all its ChEBI ids (every charge form,
+  from the pack), as `(chebi:a OR chebi:b) AND ...`; with nothing
+  identified, quoted names are searched instead. When nothing has every
+  molecule, each one is left out in turn and the answers merged (a
+  molecule may be identified with an entry Rhea does not use, such as an
+  uncharged or open-chain form). Results are ranked locally: share of the
+  model's molecules present, plus 0.6 for each identified molecule whose
+  name nearly matches one of Rhea's (word overlap of 0.6 or more, stereo
+  and form prefixes ignored: "keto-D-fructose 6-phosphate" ~ "beta-D-
+  fructose 6-phosphate"), +0.5 when they are on the same sides (either
+  direction; only when Rhea's id list lines up with its equation), -0.25
+  for each other main molecule. Each result says why ("Has 1 of the 2
+  molecules, and beta-D-fructose 6-phosphate (like keto-D-fructose
+  6-phosphate), on the same sides"). A complete fit is marked "fits".
+- Accepting writes `bqbiol:is` with the identifiers.org URI and, if the
+  element has none, an SBO term (247 simple chemical, 252 polypeptide
+  chain, 176 biochemical reaction): one undo step
+  (`Workspace::accept_uri`). If the pack knows the entry (a Rhea id of a
+  BiGG reaction), it is the same as accepting the pack's entry, links and
+  all. Otherwise the list shows the entry's name for the rest of the
+  session ("Identified as keto-D-fructose 6-phosphate (ChEBI
+  CHEBI:15946)"); after reloading it shows as annotated elsewhere.
+
+Tests read saved answers (`crates/annot-online/tests/fixtures`, fetched
+2026-11-14). Checked in Chrome on the glycolysis example: X2 searched as
+"fructose 6-phosphate" and accepted from ChEBI; vPGI (G6P -> X2) then
+finds glucose-6-phosphate isomerase, RHEA:11816, first.
+
+Not yet: an organism filter for UniProt (from the model's taxon); a
+second Rhea pass by EC number or enzyme name; remembering names of
+entries accepted from other databases across reloads; GO for
+compartments.
 
 ## 6. Benchmark (`annot-cli bench`)
 
