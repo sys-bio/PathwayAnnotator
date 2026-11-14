@@ -58,6 +58,11 @@ struct Ctx {
     /// Whose proteins UniProt searches cover (an NCBI taxon id), `None`
     /// for any organism. Starts as the model's organism, if it says.
     organism: RwSignal<Option<u32>>,
+    /// The row the keyboard is on ([`on_key`]); clicking a row moves it
+    /// there too.
+    cursor: RwSignal<Option<Element>>,
+    /// Whether the keyboard shortcuts panel is showing.
+    help: RwSignal<bool>,
 }
 
 /// Opens an element in its tab and scrolls it into view.
@@ -134,8 +139,12 @@ pub fn App() -> impl IntoView {
         pinned: RwSignal::new(None),
         return_to: RwSignal::new(None),
         organism: RwSignal::new(None),
+        cursor: RwSignal::new(None),
+        help: RwSignal::new(false),
     };
     provide_context(ctx);
+    // Lives as long as the page: the app never unmounts.
+    let _keys = window_event_listener(leptos::ev::keydown, move |ev| on_key(ctx, ev));
 
     spawn_local(async move {
         match browser::fetch_pack("kpack.bin").await {
@@ -155,6 +164,7 @@ pub fn App() -> impl IntoView {
                 let mut session = Session::new(p, ws, name);
                 session.remember_online(browser::remembered_names());
                 ctx.session.set(Some(session));
+                ctx.cursor.set(None);
                 ctx.selected.set(None);
                 ctx.filter.set(Filter::All);
                 ctx.message.set(None);
@@ -190,6 +200,7 @@ pub fn App() -> impl IntoView {
                 }
             }}
             <Message/>
+            <Shortcuts/>
         </main>
     }
 }
@@ -214,6 +225,14 @@ fn Header() -> impl IntoView {
         <header class="top">
             <h1>"PathwayAnnotator"</h1>
             <span class="file">{file}</span>
+            <button
+                class="link shortcuts-button"
+                title="Keyboard shortcuts (press ?)"
+                aria-expanded=move || ctx.help.get().to_string()
+                on:click=move |_| ctx.help.update(|h| *h = !*h)
+            >
+                "Shortcuts " <kbd>"?"</kbd>
+            </button>
             <Show when=move || file().is_some()>
                 <div class="actions">
                     <button on:click=move |_| s.update(|s| if let Some(s) = s { s.undo() }) disabled=move || !can_undo()>
@@ -372,7 +391,10 @@ fn Tabs() -> impl IntoView {
                 class="tab"
                 class:active=move || ctx.tab.get() == t
                 aria-selected=move || (ctx.tab.get() == t).to_string()
-                on:click=move |_| ctx.tab.set(t)
+                on:click=move |_| {
+                    ctx.tab.set(t);
+                    ctx.cursor.set(None);
+                }
             >
                 {label}
             </button>
@@ -401,21 +423,22 @@ fn Tabs() -> impl IntoView {
     }
 }
 
+/// The rows of a tab under a filter, in order.
+fn rows_of(s: &Session, tab: Tab, filter: Filter) -> Vec<Element> {
+    let all = match tab {
+        Tab::Molecules => s.species(),
+        Tab::Reactions => s.reactions(),
+        Tab::Compartments => s.compartments(),
+    };
+    all.into_iter().filter(|el| filter.keeps(&s.status(*el))).collect()
+}
+
 #[component]
 fn ItemList() -> impl IntoView {
     let ctx = expect_context::<Ctx>();
     let items = move || {
-        let tab = ctx.tab.get();
-        let filter = ctx.filter.get();
-        ctx.session.with(|s| {
-            let Some(s) = s else { return Vec::new() };
-            let all = match tab {
-                Tab::Molecules => s.species(),
-                Tab::Reactions => s.reactions(),
-                Tab::Compartments => s.compartments(),
-            };
-            all.into_iter().filter(|el| filter.keeps(&s.status(*el))).collect::<Vec<_>>()
-        })
+        let (tab, filter) = (ctx.tab.get(), ctx.filter.get());
+        ctx.session.with(|s| s.as_ref().map(|s| rows_of(s, tab, filter)).unwrap_or_default())
     };
     // After jumping from a reaction's molecule chip: the way back.
     let back = move || {
@@ -464,7 +487,10 @@ fn Item(el: Element) -> impl IntoView {
     };
     let status = move || s.with(|s| s.as_ref().map(|s| s.status(el)).unwrap_or(Status::Unknown));
     let open = move || ctx.selected.get() == Some(el);
-    let toggle = move |_| ctx.selected.update(|sel| *sel = if *sel == Some(el) { None } else { Some(el) });
+    let toggle = move |_| {
+        ctx.cursor.set(Some(el));
+        ctx.selected.update(|sel| *sel = if *sel == Some(el) { None } else { Some(el) });
+    };
     // A compartment's suggestion is a GO term from the pack's table of
     // compartment names, not a pack entry.
     let compartment = matches!(el, Element::Compartment(_));
@@ -547,7 +573,7 @@ fn Item(el: Element) -> impl IntoView {
         }
     };
     view! {
-        <li class="item" class:open=open id=dom_id(el)>
+        <li class="item" class:open=open class:cursor=move || ctx.cursor.get() == Some(el) id=dom_id(el)>
             <div class="row" on:click=toggle>
                 <span class=move || format!("dot {}", status().class())></span>
                 <span class="name">{name}</span>
@@ -1472,6 +1498,241 @@ fn Details(el: Element) -> impl IntoView {
                     })
             }}
         </div>
+    }
+}
+
+/// Whether a key press is typing (in a text box, menu or editable text),
+/// which shortcuts leave alone.
+fn typing(ev: &web_sys::KeyboardEvent) -> bool {
+    use wasm_bindgen::JsCast;
+    let Some(el) = ev.target().and_then(|t| t.dyn_into::<web_sys::HtmlElement>().ok()) else {
+        return false;
+    };
+    matches!(el.tag_name().as_str(), "INPUT" | "TEXTAREA" | "SELECT") || el.is_content_editable()
+}
+
+/// Whether the key press is on a button or link, where Enter belongs to it.
+fn on_control(ev: &web_sys::KeyboardEvent) -> bool {
+    use wasm_bindgen::JsCast;
+    ev.target()
+        .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+        .is_some_and(|el| matches!(el.tag_name().as_str(), "BUTTON" | "A" | "SUMMARY"))
+}
+
+/// Scrolls a row into view, as little as needed.
+fn scroll_to(el: Element) {
+    set_timeout(
+        move || {
+            if let Some(e) = document().get_element_by_id(&dom_id(el)) {
+                let opts = web_sys::ScrollIntoViewOptions::new();
+                opts.set_block(web_sys::ScrollLogicalPosition::Nearest);
+                e.scroll_into_view_with_scroll_into_view_options(&opts);
+            }
+        },
+        Duration::from_millis(30),
+    );
+}
+
+/// The keyboard shortcuts (listed in [`Shortcuts`]). Keys typed into a
+/// text box or menu are left alone, and so is Enter on a button.
+fn on_key(ctx: Ctx, ev: web_sys::KeyboardEvent) {
+    if ev.alt_key() || ev.meta_key() || typing(&ev) {
+        return;
+    }
+    let s = ctx.session;
+    let key = ev.key();
+    if ev.ctrl_key() {
+        let redo = matches!(key.as_str(), "y" | "Y") || (ev.shift_key() && matches!(key.as_str(), "z" | "Z"));
+        let undo = !ev.shift_key() && matches!(key.as_str(), "z" | "Z");
+        if !(undo || redo) || s.with_untracked(|s| s.is_none()) {
+            return;
+        }
+        ev.prevent_default();
+        s.update(|s| {
+            if let Some(s) = s {
+                if redo { s.redo() } else { s.undo() }
+            }
+        });
+        return;
+    }
+    match key.as_str() {
+        "?" => ctx.help.update(|h| *h = !*h),
+        "Escape" => {
+            if ctx.help.get_untracked() {
+                ctx.help.set(false);
+            } else if ctx.pinned.get_untracked().is_some() {
+                ctx.pinned.set(None);
+            } else if ctx.selected.get_untracked().is_some() {
+                ctx.selected.set(None);
+            } else {
+                return;
+            }
+        }
+        _ if s.with_untracked(|s| s.is_none()) => return,
+        "j" | "ArrowDown" => move_cursor(ctx, 1),
+        "k" | "ArrowUp" => move_cursor(ctx, -1),
+        "n" => next_to_review(ctx),
+        "Enter" | "o" => {
+            if key == "Enter" && on_control(&ev) {
+                return;
+            }
+            let Some(el) = ctx.cursor.get_untracked() else { return };
+            ctx.selected.update(|sel| *sel = if *sel == Some(el) { None } else { Some(el) });
+            scroll_to(el);
+        }
+        "a" => act_on_cursor(ctx, true),
+        "r" => act_on_cursor(ctx, false),
+        "/" => {
+            let Some(el) = ctx.cursor.get_untracked().or(ctx.selected.get_untracked()) else { return };
+            ctx.selected.set(Some(el));
+            set_timeout(
+                move || {
+                    let sel = format!("#{} .online input", dom_id(el));
+                    if let Ok(Some(input)) = document().query_selector(&sel) {
+                        use wasm_bindgen::JsCast;
+                        // Selected, so typing replaces it and Enter searches.
+                        if let Ok(input) = input.dyn_into::<web_sys::HtmlInputElement>() {
+                            let _ = input.focus();
+                            input.select();
+                            input.scroll_into_view();
+                        }
+                    }
+                },
+                Duration::from_millis(50),
+            );
+        }
+        "1" | "2" | "3" => {
+            ctx.tab.set(match key.as_str() {
+                "1" => Tab::Molecules,
+                "2" => Tab::Reactions,
+                _ => Tab::Compartments,
+            });
+            ctx.cursor.set(None);
+        }
+        _ => return,
+    }
+    ev.prevent_default();
+}
+
+/// The rows showing now.
+fn visible_rows(ctx: Ctx) -> Vec<Element> {
+    let (tab, filter) = (ctx.tab.get_untracked(), ctx.filter.get_untracked());
+    ctx.session.with_untracked(|s| s.as_ref().map(|s| rows_of(s, tab, filter)).unwrap_or_default())
+}
+
+/// Moves the keyboard cursor `by` rows (from the first row if none).
+fn move_cursor(ctx: Ctx, by: isize) {
+    let rows = visible_rows(ctx);
+    if rows.is_empty() {
+        return;
+    }
+    let at = ctx.cursor.get_untracked().and_then(|c| rows.iter().position(|r| *r == c));
+    let next = match at {
+        Some(i) => (i as isize + by).clamp(0, rows.len() as isize - 1) as usize,
+        None => 0,
+    };
+    ctx.cursor.set(Some(rows[next]));
+    scroll_to(rows[next]);
+}
+
+/// Moves the cursor to the next row with a suggestion to review, wrapping
+/// round.
+fn next_to_review(ctx: Ctx) {
+    let rows = visible_rows(ctx);
+    let start = ctx.cursor.get_untracked().and_then(|c| rows.iter().position(|r| *r == c)).map_or(0, |i| i + 1);
+    let found = ctx.session.with_untracked(|s| {
+        let s = s.as_ref()?;
+        (0..rows.len()).map(|k| rows[(start + k) % rows.len()]).find(|el| matches!(s.status(*el), Status::Suggested { .. }))
+    });
+    match found {
+        Some(el) => {
+            ctx.cursor.set(Some(el));
+            scroll_to(el);
+        }
+        None => ctx.message.set(Some("Nothing left to review in this list.".into())),
+    }
+}
+
+/// Accepts (or rejects) the suggestion on the cursor's row, then moves to
+/// the next row.
+fn act_on_cursor(ctx: Ctx, accept: bool) {
+    let Some(el) = ctx.cursor.get_untracked() else {
+        ctx.message.set(Some("Pick a row first: press j or k, or click one.".into()));
+        return;
+    };
+    let rows = visible_rows(ctx);
+    let next = rows.iter().position(|r| *r == el).and_then(|i| rows.get(i + 1)).copied();
+    ctx.session.update(|s| {
+        let Some(s) = s else { return };
+        if !matches!(s.status(el), Status::Suggested { .. }) {
+            let what = if accept { "accept" } else { "reject" };
+            ctx.message.set(Some(format!("There is no suggestion to {what} for {}.", s.display_name(el))));
+            return;
+        }
+        let msg = match (el, accept) {
+            (Element::Compartment(_), true) => s.accept_compartment(el),
+            (Element::Compartment(_), false) => s.reject_compartment(el),
+            _ => match s.candidates(el).first().map(|c| c.target) {
+                Some(t) if accept => s.accept(el, t),
+                Some(t) => s.reject(el, t),
+                None => return,
+            },
+        };
+        ctx.message.set(Some(msg));
+    });
+    if let Some(n) = next {
+        ctx.cursor.set(Some(n));
+        scroll_to(n);
+    }
+}
+
+/// The keyboard shortcuts, shown with ? or the Shortcuts button.
+#[component]
+fn Shortcuts() -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    let rows: &[(&[&str], &str)] = &[
+        (&["j", "Down"], "next row"),
+        (&["k", "Up"], "previous row"),
+        (&["n"], "next row with a suggestion to review"),
+        (&["Enter", "o"], "open or close the row's details"),
+        (&["a"], "accept the row's suggestion, then go to the next row"),
+        (&["r"], "reject the row's suggestion, then go to the next row"),
+        (&["/"], "search other databases for the row"),
+        (&["1", "2", "3"], "Molecules, Reactions, Compartments"),
+        (&["Ctrl+Z"], "undo"),
+        (&["Ctrl+Y", "Ctrl+Shift+Z"], "redo"),
+        (&["Esc"], "close this, a pinned card, or the details"),
+        (&["?"], "show or hide this list"),
+    ];
+    view! {
+        <Show when=move || ctx.help.get()>
+            <div class="shortcuts" role="dialog" aria-label="Keyboard shortcuts">
+                <div class="shortcuts-head">
+                    <h3>"Keyboard shortcuts"</h3>
+                    <button class="link" on:click=move |_| ctx.help.set(false)>"Close"</button>
+                </div>
+                <table>
+                    {rows
+                        .iter()
+                        .map(|(keys, what)| {
+                            view! {
+                                <tr>
+                                    <td class="keys">
+                                        {keys
+                                            .iter()
+                                            .enumerate()
+                                            .map(|(i, k)| view! { {(i > 0).then_some(" or ")} <kbd>{*k}</kbd> })
+                                            .collect_view()}
+                                    </td>
+                                    <td>{*what}</td>
+                                </tr>
+                            }
+                        })
+                        .collect_view()}
+                </table>
+                <p class="muted">"Shortcuts do nothing while you type in a box."</p>
+            </div>
+        </Show>
     }
 }
 

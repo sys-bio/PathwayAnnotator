@@ -191,6 +191,24 @@ ul.items { list-style: none; margin: 0; padding: 0; }
 .online h5 { margin: 10px 0 4px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .online .detail { margin: 2px 0; font-size: 13px; }
 
+/* Keyboard: the row the keyboard is on, and the shortcuts panel. */
+.item.cursor > .row { box-shadow: inset 3px 0 0 var(--accent); background: var(--chip-bg); border-radius: 8px; }
+kbd {
+  font-family: ui-monospace, monospace; font-size: 12px; padding: 0 5px; border: 1px solid var(--border);
+  border-bottom-width: 2px; border-radius: 4px; background: var(--surface); color: var(--text);
+}
+.shortcuts-button { margin-left: auto; font-size: 13px; }
+.shortcuts {
+  position: fixed; right: 16px; bottom: 16px; z-index: 40; width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px); overflow: auto; padding: 12px 16px; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22); font-size: 14px;
+}
+.shortcuts-head { display: flex; align-items: baseline; justify-content: space-between; }
+.shortcuts h3 { margin: 0 0 8px; font-size: 15px; }
+.shortcuts table { border-collapse: collapse; width: 100%; }
+.shortcuts td { padding: 3px 6px 3px 0; vertical-align: top; }
+.shortcuts td.keys { white-space: nowrap; color: var(--muted); }
+
 /* The way back after jumping from a reaction to a molecule. */
 .back { position: sticky; top: 0; z-index: 10; padding: 6px 0; background: var(--bg); }
 .back button { display: inline-flex; align-items: center; gap: 2px; border-color: var(--accent); color: var(--accent); }

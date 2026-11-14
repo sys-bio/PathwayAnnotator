@@ -668,8 +668,16 @@ Known issues / next (in order):
   views.rs, measured in the frame the card appears, so it does not flash).
   The extra space below the list is gone.
 - Started (2026-11-14): searching other databases; see "Searching other
-  databases" below. No keyboard shortcuts, no SBO / qualifier editing in
-  the UI yet.
+  databases" below. No SBO / qualifier editing in the UI yet.
+- Done (2026-11-14): keyboard shortcuts (`on_key` in views.rs; the list is
+  the `Shortcuts` panel, opened with ? or the Shortcuts button in the
+  header). A row cursor (j / k or arrows; n jumps to the next row with a
+  suggestion; clicking a row moves it too); Enter or o opens Details; a /
+  r accept / reject the row's suggestion and move to the next row; /
+  opens Details with the search box focused and its text selected; 1 2 3
+  switch tabs; Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z undo and redo; Esc closes
+  the panel, a pinned card or Details. Keys typed into a text box or menu
+  are left alone, and so is Enter on a button or link.
 - Publishing to GitHub Pages needs a CI job that builds the pack (BiGG,
   ChEBI and BioModels fetch, ~10 minutes) or a pack published as a release
   asset.
