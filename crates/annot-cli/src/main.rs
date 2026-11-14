@@ -42,6 +42,14 @@ enum Command {
         /// right or not) as TSV, for calibrating confidence levels.
         #[arg(long)]
         observations: Option<PathBuf>,
+        /// Give the engine every species' true identity, as if the user had
+        /// confirmed them all, and grade the reactions in that situation.
+        #[arg(long)]
+        confirmed_species: bool,
+        /// Give the engine every reaction's true identity, as if the user had
+        /// confirmed them all, and grade the species in that situation.
+        #[arg(long)]
+        confirmed_reactions: bool,
     },
 }
 
@@ -56,7 +64,18 @@ fn main() -> ExitCode {
             out,
             allow_leak,
             observations,
-        } => run_bench(&pack, &models, &set, &out, allow_leak, observations.as_deref()),
+            confirmed_species,
+            confirmed_reactions,
+        } => run_bench(&BenchOptions {
+            pack,
+            models,
+            set,
+            out,
+            allow_leak,
+            observations,
+            confirmed_species,
+            confirmed_reactions,
+        }),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -67,14 +86,22 @@ fn main() -> ExitCode {
     }
 }
 
-fn run_bench(
-    pack_path: &std::path::Path,
-    models: &std::path::Path,
-    set: &str,
-    out: &std::path::Path,
+/// What `bench` was asked to do.
+struct BenchOptions {
+    pack: PathBuf,
+    models: PathBuf,
+    set: String,
+    out: PathBuf,
     allow_leak: bool,
-    observations: Option<&std::path::Path>,
-) -> Result<()> {
+    observations: Option<PathBuf>,
+    confirmed_species: bool,
+    confirmed_reactions: bool,
+}
+
+fn run_bench(o: &BenchOptions) -> Result<()> {
+    let (pack_path, models, set, out) = (o.pack.as_path(), o.models.as_path(), o.set.as_str(), o.out.as_path());
+    let (allow_leak, observations) = (o.allow_leak, o.observations.as_deref());
+    let (confirmed_species, confirmed_reactions) = (o.confirmed_species, o.confirmed_reactions);
     let pack = kpack::decode(&std::fs::read(pack_path).map_err(|e| format!("cannot read {}: {e}", pack_path.display()))?)?;
     let held_out = pack
         .header
@@ -131,7 +158,13 @@ fn run_bench(
             continue;
         };
         match input::read(id, &xml, &pack) {
-            Ok(g) => {
+            Ok(mut g) => {
+                if confirmed_species {
+                    confirm_species(&mut g);
+                }
+                if confirmed_reactions {
+                    confirm_reactions(&mut g);
+                }
                 let novel = set == "test"
                     && bench::best_overlap(&bench::name_set(&g.model), &training) < bench::NOVEL_OVERLAP;
                 bench::grade(&pack, &g, novel, &mut results);
@@ -140,12 +173,10 @@ fn run_bench(
         }
     }
     if let Some(path) = observations {
-        let mut t = String::from("kind	novel	basis	score	ratio	right	level
-");
+        let mut t = String::from("kind\tnovel\tbasis\tscore\tratio\tright\tlevel\n");
         for o in &results.observations {
             t.push_str(&format!(
-                "{}	{}	{}	{:.3}	{:.3}	{}	{}
-",
+                "{}\t{}\t{}\t{:.3}\t{:.3}\t{}\t{}\n",
                 if o.reaction { "reaction" } else { "species" },
                 o.novel,
                 format!("{:?}", o.basis).to_lowercase(),
@@ -156,12 +187,38 @@ fn run_bench(
             ));
         }
         std::fs::write(path, t)?;
+        // Every miss, with the first suggestion's evidence, beside it.
+        let mut m = String::from("kind\tmodel\telement\tname\ttruth\tfirst\tlevel\twhy\n");
+        for (reaction, list) in [(false, &results.species_misses), (true, &results.reaction_misses)] {
+            for x in list {
+                m.push_str(&format!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                    if reaction { "reaction" } else { "species" },
+                    x.model,
+                    x.element,
+                    x.name.as_deref().unwrap_or(""),
+                    x.truth,
+                    x.first.as_deref().unwrap_or(""),
+                    x.level.map_or("-", |l| l.label()),
+                    x.why
+                ));
+            }
+        }
+        std::fs::write(path.with_extension("misses.tsv"), m)?;
     }
     results.species_misses.sort();
     results.reaction_misses.sort();
 
     let providers: Vec<&str> = annot_engine::providers().iter().map(|p| p.name()).collect();
     let date = kpack_build::date::today();
+    let mut scenario = set.to_string();
+    if confirmed_species {
+        scenario.push_str("+confirmed-species");
+    }
+    if confirmed_reactions {
+        scenario.push_str("+confirmed-reactions");
+    }
+    let set = scenario.as_str();
     let report = bench::report(&results, &pack, set, &date, &providers);
     std::fs::create_dir_all(out)?;
     std::fs::write(out.join("latest.md"), &report)?;
@@ -193,7 +250,7 @@ fn run_bench(
         pct(r.top3, r.gradable),
         pct(r.suggested, r.gradable),
     );
-    if set == "test" {
+    if set.starts_with("test") {
         let (ns, nr) = (&results.novel_species, &results.novel_reactions);
         println!(
             "Novel test models only ({} of {}): species top-1 {:.1}% of {}, reactions top-1 {:.1}% of {}.",
@@ -207,4 +264,28 @@ fn run_bench(
     }
     println!("report: {}", out.join("latest.md").display());
     Ok(())
+}
+
+/// Tells the engine each species' identity from the answer key, as a user
+/// confirming them would. Only unambiguous answers are given.
+fn confirm_species(g: &mut input::Graded) {
+    for (i, key) in g.species.iter().enumerate() {
+        if let input::Key::Known { accept, tie: false } = key
+            && let [kpack::Target::Entity(e)] = accept.as_slice()
+        {
+            g.model.species[i].known = Some(*e);
+        }
+    }
+}
+
+/// Tells the engine each reaction's identity from the answer key, as a user
+/// confirming them would. Only unambiguous answers are given.
+fn confirm_reactions(g: &mut input::Graded) {
+    for (i, key) in g.reactions.iter().enumerate() {
+        if let input::Key::Known { accept, tie: false } = key
+            && let [kpack::Target::Reaction(r)] = accept.as_slice()
+        {
+            g.model.reactions[i].known = Some(*r);
+        }
+    }
 }

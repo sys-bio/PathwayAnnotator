@@ -58,6 +58,10 @@ pub struct Miss {
     pub name: Option<String>,
     pub truth: String,
     pub first: Option<String>,
+    /// The engine's confidence in its first suggestion.
+    pub level: Option<annot_engine::Confidence>,
+    /// The first suggestion's evidence notes, for diagnosis.
+    pub why: String,
 }
 
 impl Score {
@@ -140,11 +144,22 @@ pub struct Observation {
     /// Second best score / best score (0 when alone).
     pub ratio: f32,
     pub right: bool,
+    /// Right, or an equivalent reaction ([`equivalent_reactions`]).
+    pub right_or_equivalent: bool,
+    /// The answer key rests only on EC numbers
+    /// ([`crate::input::Graded::reaction_key_coarse`]).
+    pub coarse_key: bool,
     /// The engine's own confidence level for it.
     pub level: annot_engine::Confidence,
 }
 
-fn observe(key: &Key, cands: &[Candidate], reaction: bool, novel: bool) -> Option<Observation> {
+fn observe(
+    key: &Key,
+    cands: &[Candidate],
+    reaction: bool,
+    novel: bool,
+    same: &dyn Fn(Target, Target) -> bool,
+) -> Option<Observation> {
     let Key::Known { accept, .. } = key else {
         return None;
     };
@@ -158,6 +173,8 @@ fn observe(key: &Key, cands: &[Candidate], reaction: bool, novel: bool) -> Optio
         score: first.score,
         ratio: if first.score > 0.0 { second / first.score } else { 0.0 },
         right: accept.contains(&first.target),
+        right_or_equivalent: accept.iter().any(|a| *a == first.target || same(*a, first.target)),
+        coarse_key: false,
         level: annot_engine::confidence(cands)?,
     })
 }
@@ -216,12 +233,23 @@ fn label(pack: &Pack, t: Target) -> String {
 pub fn grade(pack: &Pack, g: &Graded, novel: bool, results: &mut Results) {
     let s = annot_engine::annotate(pack, &g.model);
     let strict = |_: Target, _: Target| false;
-    let same_reaction = |a: Target, b: Target| equivalent_reactions(pack, a, b);
+    // A reaction suggestion is also equivalent if it carries one of the EC
+    // numbers the curator wrote on that reaction: annotated "KEGG R01786,
+    // EC 2.7.1.2", the pack may not know R01786, but a glucokinase is what
+    // the curator meant.
+    let same_reaction_at = |i: usize| {
+        move |a: Target, b: Target| equivalent_reactions(pack, a, b) || has_ec(pack, b, &g.reaction_ecs[i])
+    };
     for (i, key) in g.species.iter().enumerate() {
-        results.observations.extend(observe(key, &s.species[i], false, novel));
+        results.observations.extend(observe(key, &s.species[i], false, novel, &strict));
     }
     for (i, key) in g.reactions.iter().enumerate() {
-        results.observations.extend(observe(key, &s.reactions[i], true, novel));
+        results.observations.extend(
+            observe(key, &s.reactions[i], true, novel, &same_reaction_at(i)).map(|mut o| {
+                o.coarse_key = g.reaction_key_coarse[i];
+                o
+            }),
+        );
     }
     results.models += 1;
     if novel {
@@ -230,7 +258,7 @@ pub fn grade(pack: &Pack, g: &Graded, novel: bool, results: &mut Results) {
             results.novel_species.record(key, &s.species[i], &strict);
         }
         for (i, key) in g.reactions.iter().enumerate() {
-            results.novel_reactions.record(key, &s.reactions[i], &same_reaction);
+            results.novel_reactions.record(key, &s.reactions[i], &same_reaction_at(i));
         }
     }
     for (i, key) in g.species.iter().enumerate() {
@@ -240,16 +268,15 @@ pub fn grade(pack: &Pack, g: &Graded, novel: bool, results: &mut Results) {
         }
     }
     for (i, key) in g.reactions.iter().enumerate() {
-        if let Some(kind) = results.reactions.record(key, &s.reactions[i], &same_reaction) {
+        if let Some(kind) = results.reactions.record(key, &s.reactions[i], &same_reaction_at(i)) {
             let r = &g.model.reactions[i];
             results.reaction_misses.push(miss(pack, kind, g, &r.id, &r.name, key, &s.reactions[i]));
         }
     }
 }
 
-/// Whether two pack reactions are the same chemistry: the same
-/// participants and stoichiometry ignoring compartments, or a shared Rhea or
-/// MetaNetX id.
+/// Whether two pack reactions are equivalent answers: the same participants
+/// and stoichiometry ignoring compartments, or a shared Rhea or MetaNetX id.
 pub fn equivalent_reactions(pack: &Pack, a: Target, b: Target) -> bool {
     let (Target::Reaction(a), Target::Reaction(b)) = (a, b) else {
         return false;
@@ -278,6 +305,17 @@ pub fn equivalent_reactions(pack: &Pack, a: Target, b: Target) -> bool {
     !ids(a).is_disjoint(&ids(b))
 }
 
+/// Whether pack reaction `t` carries one of the EC numbers in `ecs`.
+fn has_ec(pack: &Pack, t: Target, ecs: &[String]) -> bool {
+    let Target::Reaction(r) = t else { return false };
+    !ecs.is_empty()
+        && pack
+            .reaction(r)
+            .xrefs
+            .iter()
+            .any(|x| pack.namespace_prefix(x.ns) == "ec-code" && ecs.iter().any(|e| e == pack.str(x.id)))
+}
+
 fn miss(
     pack: &Pack,
     kind: MissKind,
@@ -302,6 +340,11 @@ fn miss(
         name: name.clone(),
         truth,
         first: cands.first().map(|c| label(pack, c.target)),
+        level: annot_engine::confidence(cands),
+        why: cands
+            .first()
+            .map(|c| c.evidence.iter().map(|e| e.note.as_str()).collect::<Vec<_>>().join(" / "))
+            .unwrap_or_default(),
     }
 }
 
@@ -323,10 +366,24 @@ pub fn report(r: &Results, pack: &Pack, set: &str, date: &str, providers: &[&str
     for s in &pack.header.sources {
         let _ = writeln!(o, "  - {} {}", s.name, s.version);
     }
-    if set != "test" {
+    if !set.starts_with("test") {
         let _ = writeln!(
             o,
             "\n**In-sample:** these models' names are in the pack. Scores overstate accuracy."
+        );
+    }
+    if set.contains("confirmed-reactions") {
+        let _ = writeln!(
+            o,
+            "
+**Reactions confirmed:** the engine was given every reaction's identity, as if the user              had confirmed them all. Only the species scores mean anything here."
+        );
+    }
+    if set.contains("confirmed-species") {
+        let _ = writeln!(
+            o,
+            "\n**Species confirmed:** the engine was given every species' identity, as if the user \
+             had confirmed them all. Only the reaction scores mean anything here."
         );
     }
     let _ = writeln!(o, "\n| | Species | Reactions |\n|---|---|---|");
@@ -346,7 +403,7 @@ pub fn report(r: &Results, pack: &Pack, set: &str, date: &str, providers: &[&str
     let (a, b) = both(&|k| pct(k.top3, k.gradable));
     row(&mut o, "Right in top 3", a, b);
     let (a, b) = both(&|k| pct(k.top1_equivalent, k.gradable));
-    row(&mut o, "Right first, counting the same chemistry under another id", a, b);
+    row(&mut o, "Right first, counting an equivalent reaction (same chemistry, Rhea or MetaNetX id, or an EC number the curator gave)", a, b);
     let (a, b) = both(&|k| pct(k.top5, k.gradable));
     row(&mut o, "Right in top 5", a, b);
     let (a, b) = both(&|k| pct(k.top1, k.suggested));
@@ -362,7 +419,7 @@ pub fn report(r: &Results, pack: &Pack, set: &str, date: &str, providers: &[&str
     let (a, b) = both(&|k| format!("{} of {} ({})", k.single_right, k.single, pct(k.single_right, k.single)));
     row(&mut o, "Lone suggestion right", a, b);
 
-    if set == "test" {
+    if set.starts_with("test") {
         let (s, x) = (&r.novel_species, &r.novel_reactions);
         let _ = writeln!(
             o,
@@ -386,7 +443,7 @@ pub fn report(r: &Results, pack: &Pack, set: &str, date: &str, providers: &[&str
         row(&mut o, "Right in top 3", pct(s.top3, s.gradable), pct(x.top3, x.gradable));
         row(
             &mut o,
-            "Right first, counting the same chemistry under another id",
+            "Right first, counting an equivalent reaction (same chemistry, Rhea or MetaNetX id, or an EC number the curator gave)",
             pct(s.top1_equivalent, s.gradable),
             pct(x.top1_equivalent, x.gradable),
         );
@@ -398,7 +455,7 @@ pub fn report(r: &Results, pack: &Pack, set: &str, date: &str, providers: &[&str
         );
     }
 
-    confidence_section(&mut o, r, set == "test");
+    confidence_section(&mut o, r, set.starts_with("test"));
 
     misses_section(&mut o, "Species", &r.species_misses, 40);
     misses_section(&mut o, "Reactions", &r.reaction_misses, 20);
@@ -424,8 +481,11 @@ How often the first suggestion was right, by the engine's own          confidenc
 "
     );
     let subsets: &[(&str, bool)] = if with_novel { &[("all", false), ("novel", true)] } else { &[("all", false)] };
-    let _ = writeln!(o, "| Models | Level | Species: share | Species: right | Reactions: share | Reactions: right |
-|---|---|---|---|---|---|");
+    let _ = writeln!(
+        o,
+        "| Models | Level | Species: share | Species: right | Reactions: share | Reactions: right | \
+         Reactions: right or equivalent | Reactions: right, specific keys only |\n|---|---|---|---|---|---|---|---|"
+    );
     for &(label, novel_only) in subsets {
         for level in [High, Likely, Uncertain] {
             let cell = |reaction: bool| {
@@ -436,11 +496,20 @@ How often the first suggestion was right, by the engine's own          confidenc
                     .collect();
                 let at: Vec<_> = pool.iter().filter(|x| x.level == level).collect();
                 let right = at.iter().filter(|x| x.right).count();
-                (pct(at.len(), pool.len()), pct(right, at.len()))
+                let equivalent = at.iter().filter(|x| x.right_or_equivalent).count();
+                // Keys that name a reaction, not just an enzyme class.
+                let specific: Vec<_> = at.iter().filter(|x| !x.coarse_key).collect();
+                let specific_right = specific.iter().filter(|x| x.right_or_equivalent).count();
+                (
+                    pct(at.len(), pool.len()),
+                    pct(right, at.len()),
+                    pct(equivalent, at.len()),
+                    format!("{} of {}", pct(specific_right, specific.len()), specific.len()),
+                )
             };
-            let (ss, sr) = cell(false);
-            let (rs, rr) = cell(true);
-            let _ = writeln!(o, "| {label} | {} | {ss} | {sr} | {rs} | {rr} |", level.label());
+            let (ss, sr, _, _) = cell(false);
+            let (rs, rr, re, rk) = cell(true);
+            let _ = writeln!(o, "| {label} | {} | {ss} | {sr} | {rs} | {rr} | {re} | {rk} |", level.label());
         }
     }
 }
@@ -467,7 +536,7 @@ fn misses_section(o: &mut String, title: &str, misses: &[Miss], per_kind: usize)
         }
         let _ = writeln!(
             o,
-            "\n### {heading} (first {} of {})\n\n| Model | Id | Name | Annotated as | First suggestion |\n|---|---|---|---|---|",
+            "\n### {heading} (first {} of {})\n\n| Model | Id | Name | Annotated as | First suggestion | Level |\n|---|---|---|---|---|---|",
             per_kind.min(picked.len()),
             picked.len()
         );
@@ -479,12 +548,13 @@ fn misses_section(o: &mut String, title: &str, misses: &[Miss], per_kind: usize)
             };
             let _ = writeln!(
                 o,
-                "| {} | {} | {} | {} | {} |",
+                "| {} | {} | {} | {} | {} | {} |",
                 m.model,
                 cell(&m.element),
                 cell(m.name.as_deref().unwrap_or("")),
                 cell(&m.truth),
-                cell(&first)
+                cell(&first),
+                m.level.map_or("-", |l| l.label())
             );
         }
     }
@@ -538,6 +608,7 @@ mod tests {
                 provider: "t",
                 weight: 1.0,
                 note: String::new(),
+                complete: false,
             }],
         }
     }

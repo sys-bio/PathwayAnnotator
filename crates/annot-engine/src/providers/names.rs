@@ -114,6 +114,7 @@ fn look_up(
                     provider: "names",
                     weight: weight(&hit, on_id),
                     note: note(field, text, &hit),
+                    complete: false,
                 },
             );
         }

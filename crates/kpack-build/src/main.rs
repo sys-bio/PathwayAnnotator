@@ -225,6 +225,10 @@ fn lookup(p: &Pack, query: &str) {
 fn show_entity(p: &Pack, id: u32) {
     let e = p.entity(id);
     println!("entity {id}: {}", p.str(e.label));
+    if !e.synonyms.is_empty() {
+        let syn: Vec<&str> = e.synonyms.iter().map(|x| p.str(*x)).collect();
+        println!("  also known as: {}", syn.join("; "));
+    }
     if let Some(f) = e.formula {
         println!("  formula {} charge {:?}", p.str(f), e.charge);
     }
@@ -265,6 +269,10 @@ fn show_entity(p: &Pack, id: u32) {
 fn show_reaction(p: &Pack, id: ReactionId) {
     let r = p.reaction(id);
     println!("reaction {id}: {}", p.str(r.label));
+    if !r.synonyms.is_empty() {
+        let syn: Vec<&str> = r.synonyms.iter().map(|x| p.str(*x)).collect();
+        println!("  also known as: {}", syn.join("; "));
+    }
     println!("  {}", equation(p, id));
     for x in &r.xrefs {
         println!("  {}:{}", p.namespace_prefix(x.ns), p.str(x.id));

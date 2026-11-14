@@ -146,6 +146,27 @@ impl Workspace {
         Ok(uris)
     }
 
+    /// Replaces what an element is identified as: removes its `bqbiol:is`
+    /// and `isVersionOf` terms that lead to anything in the pack, then
+    /// accepts `target` as [`Workspace::accept`] does. Terms the pack does
+    /// not know (a protein, another database) are kept. One undoable edit.
+    /// Returns the URIs added.
+    pub fn replace_identity(&mut self, pack: &Pack, el: Element, target: Target) -> Result<Vec<String>, EditError> {
+        let uris = uris_for(pack, target);
+        let mut meta = self.with_terms(el, |terms| {
+            for t in terms.iter_mut().filter(|t| !t.model && (t.qualifier == "is" || t.qualifier == "isVersionOf")) {
+                t.resources.retain(|r| pack.find_resource(r).is_empty());
+            }
+            add(terms, "is", &uris)
+        })?;
+        let sbo_allowed = !(self.doc.level == 2 && self.doc.version == 1);
+        if meta.sbo_term.is_none() && sbo_allowed {
+            meta.sbo_term = Some(format!("SBO:{:07}", sbo_for(pack, target)));
+        }
+        self.apply(el, meta);
+        Ok(uris)
+    }
+
     /// The element's metadata with its terms changed by `f`, everything
     /// else in its annotation kept.
     fn with_terms(

@@ -26,6 +26,13 @@ pub struct Species {
     pub name: Option<String>,
     /// The compartment's id.
     pub compartment: Option<String>,
+    /// What it is already known to be (the user confirmed it, or the model
+    /// was already annotated). Context treats it as certain. The benchmark
+    /// leaves this empty, since its answers come from the annotations.
+    pub known: Option<kpack::EntityId>,
+    /// Entities the user rejected for it: never suggested, never used as a
+    /// guess to reason from.
+    pub rejected: Vec<kpack::EntityId>,
 }
 
 /// A reaction.
@@ -34,6 +41,12 @@ pub struct Reaction {
     pub id: String,
     pub name: Option<String>,
     pub participants: Vec<Participant>,
+    /// What it is already known to be (confirmed by the user, or annotated
+    /// in the model). Its molecules are then read off the database
+    /// reaction. The benchmark leaves this empty.
+    pub known: Option<kpack::ReactionId>,
+    /// Reactions the user rejected for it.
+    pub rejected: Vec<kpack::ReactionId>,
 }
 
 /// A species' part in a reaction.

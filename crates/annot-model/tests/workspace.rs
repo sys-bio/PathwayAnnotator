@@ -139,6 +139,47 @@ fn undo_and_redo() {
 }
 
 #[test]
+fn accepting_twice_adds_but_replacing_swaps() {
+    let p = pack();
+    let f6p = entity(&p, "f6p");
+    let g6p = entity(&p, "g6p");
+
+    // Two accepts leave both identities: what the app must not do.
+    let mut w = load(MODEL).unwrap();
+    w.accept(&p, Element::Species(1), f6p).unwrap();
+    w.accept(&p, Element::Species(1), g6p).unwrap();
+    let Resolution::Known { targets, .. } = w.resolution(&p, Element::Species(1)) else { panic!() };
+    assert_eq!(targets.len(), 2);
+
+    // Replacing swaps, in one undoable step.
+    let mut w = load(MODEL).unwrap();
+    w.accept(&p, Element::Species(1), f6p).unwrap();
+    let after_accept = w.to_sbml();
+    w.replace_identity(&p, Element::Species(1), g6p).unwrap();
+    assert_eq!(
+        w.resolution(&p, Element::Species(1)),
+        Resolution::Known { targets: vec![g6p], tie: false, exact: true }
+    );
+    w.undo();
+    assert_eq!(w.to_sbml(), after_accept);
+}
+
+#[test]
+fn replacing_keeps_what_the_pack_does_not_know() {
+    let p = pack();
+    let mut w = load(MODEL).unwrap();
+    let protein = "https://identifiers.org/uniprot:P12345".to_string();
+    w.add_terms(Element::Species(0), "is", std::slice::from_ref(&protein)).unwrap();
+    w.replace_identity(&p, Element::Species(0), entity(&p, "f6p")).unwrap();
+    let uris = w.identity_uris(Element::Species(0));
+    assert!(uris.contains(&protein), "{uris:?}");
+    // The old ChEBI URN for G6P is gone.
+    assert!(!uris.iter().any(|u| u.contains("4170")), "{uris:?}");
+    // Other tools' XML stays.
+    assert!(w.to_sbml().contains("tool:data"));
+}
+
+#[test]
 fn removing_a_term() {
     let mut w = load(MODEL).unwrap();
     let urn = "urn:miriam:obo.chebi:CHEBI%3A4170";

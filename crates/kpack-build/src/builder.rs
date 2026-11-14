@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use kpack::{
-    CompId, CompartmentDef, Entity, EntityId, Header, NameHit, NameIndex, Namespace, NsId, Pack,
+    CompId, CompartmentDef, Entity, EntityId, Header, NameHit, NameIndex, NameKind, Namespace, NsId, Pack,
     Reaction, ReactionId, SourceInfo, Sources, StrId, StringTable, Target, Xref, XrefIndex,
     XrefKey, XrefScope,
 };
@@ -28,6 +28,162 @@ pub fn merge_xref(xrefs: &mut Vec<Xref>, x: Xref) {
             e.sources |= x.sources;
         }
         None => xrefs.push(x),
+    }
+}
+
+/// Synonyms kept per entity or reaction.
+pub const MAX_SYNONYMS: usize = 6;
+/// Longer names (IUPAC names, mostly) are not shown as synonyms.
+pub const MAX_SYNONYM_LEN: usize = 40;
+
+/// Words that say where a molecule is rather than what it is: a model's
+/// "Extracellular Glucose" is not a name for glucose.
+const LOCATION_WORDS: &[&str] = &[
+    "extracellular", "intracellular", "external", "internal", "extern", "outside", "inside", "in",
+    "out", "ex", "ext", "cytoplasm", "cytoplasmic", "cytosol", "cytosolic", "mitochondria",
+    "mitochondrial", "mitochondrion", "golgi", "nucleus", "nuclear", "plasma", "medium", "cell",
+    "cellular", "periplasm", "periplasmic", "vacuole", "vacuolar", "lysosome", "peroxisome", "er",
+    "cyt", "cyto", "mit", "total", "free",
+];
+
+/// Whether a name from a model is a plain name: no brackets or dots, no
+/// location words, and no location ending glued to an abbreviation
+/// ("DHAPc", "GLCex").
+fn plain_model_name(name: &str) -> bool {
+    if name.contains(['[', ']', '(', ')', '.', ',']) {
+        return false;
+    }
+    let tokens: Vec<String> = name
+        .split(|c: char| c.is_whitespace() || c == '-' || c == '/')
+        .filter(|t| !t.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    if tokens.iter().any(|t| LOCATION_WORDS.contains(&t.as_str())) {
+        return false;
+    }
+    let glued = name.split_whitespace().any(|t| {
+        let upper = t.chars().take_while(|c| c.is_ascii_uppercase() || c.is_ascii_digit()).count();
+        let rest = &t[upper..];
+        upper >= 2 && ["c", "e", "m", "ex", "in", "out", "cyt", "mit"].contains(&rest)
+    });
+    !glued
+}
+
+/// Whether a name is a chemical formula ("CH3COCOOH", "H2PO4", or a word
+/// followed by one, "ATP C10H12N5O13P3"): element symbols and counts only.
+fn has_formula(name: &str) -> bool {
+    name.split_whitespace().any(|word| {
+        let w = word.trim_matches(|c: char| !c.is_ascii_alphanumeric());
+        let mut chars = w.chars().peekable();
+        let (mut elements, mut digits) = (0, 0);
+        while let Some(c) = chars.next() {
+            if !c.is_ascii_uppercase() {
+                return false;
+            }
+            if chars.peek().is_some_and(|n| n.is_ascii_lowercase()) {
+                chars.next();
+            }
+            elements += 1;
+            while chars.peek().is_some_and(|n| n.is_ascii_digit()) {
+                chars.next();
+                digits += 1;
+            }
+        }
+        elements >= 2 && digits >= 1
+    })
+}
+
+/// The names to show beside a label, most familiar first.
+///
+/// Database names (ChEBI, BiGG) come first: they are curated. A name found
+/// only in models must be used in at least two of them (one-offs are often
+/// typos) and be a plain name ([`plain_model_name`]). Within each group:
+/// full names before short abbreviations (four characters or fewer), then
+/// names used in more curated models, then shorter ones. Left out always:
+/// the label itself written differently, ids (anything with "_"), names
+/// differing only by a charge suffix, and long names. One spelling per
+/// normalized name, a database's spelling when there is one.
+pub fn pick_synonyms(label: &str, names: &[(String, NameHit)]) -> Vec<String> {
+    struct Choice {
+        spelling: String,
+        curated: bool,
+        count: u16,
+    }
+    let label_key = kpack::normalize_name(label);
+    let mut best: HashMap<String, Choice> = HashMap::new();
+    for (name, hit) in names {
+        let name = kpack::strip_charge_suffix(name.trim());
+        let key = kpack::normalize_name(name);
+        let usable = matches!(hit.kind, NameKind::Preferred | NameKind::Synonym | NameKind::Abbreviation)
+            && !key.is_empty()
+            && key != label_key
+            && !name.contains(['_', '[', ']', '<', '>'])
+            && !has_formula(name)
+            && name.chars().count() <= MAX_SYNONYM_LEN;
+        if !usable {
+            continue;
+        }
+        let curated = hit.sources.contains(Sources::CHEBI) || hit.sources.contains(Sources::BIGG);
+        let c = best.entry(key).or_insert_with(|| Choice {
+            spelling: name.to_string(),
+            curated,
+            count: 0,
+        });
+        c.count = c.count.max(hit.count);
+        // The spelling with more lower-case letters ("D-glucose" over
+        // "D-GLUCOSE"); it reads as a name, not a shout.
+        let lower = |s: &str| s.chars().filter(|ch| ch.is_lowercase()).count();
+        if lower(name) > lower(&c.spelling) {
+            c.spelling = name.to_string();
+        }
+        c.curated |= curated;
+    }
+    let mut picked: Vec<Choice> = best
+        .into_values()
+        .filter(|c| c.curated || (c.count >= 2 && plain_model_name(&c.spelling)))
+        .collect();
+    // How much a name reads like words: lower-case letters, capped so long
+    // systematic names do not win ("Adenosine triphosphate" before
+    // "H4atp", "glucose" before "Glc-OH").
+    let wordy = |s: &str| s.chars().filter(|ch| ch.is_lowercase()).count().min(10);
+    picked.sort_by(|a, b| {
+        let abbrev = |s: &str| s.chars().count() <= 4;
+        b.curated
+            .cmp(&a.curated)
+            .then(abbrev(&a.spelling).cmp(&abbrev(&b.spelling)))
+            .then(b.count.cmp(&a.count))
+            .then(wordy(&b.spelling).cmp(&wordy(&a.spelling)))
+            .then(a.spelling.len().cmp(&b.spelling.len()))
+            .then(a.spelling.cmp(&b.spelling))
+    });
+    picked.into_iter().take(MAX_SYNONYMS).map(|c| c.spelling).collect()
+}
+
+#[cfg(test)]
+mod synonym_tests {
+    use super::*;
+
+    #[test]
+    fn formulas() {
+        assert!(has_formula("CH3COCOOH"));
+        assert!(has_formula("H2PO4"));
+        assert!(has_formula("ATP C10H12N5O13P3"));
+        assert!(!has_formula("ATP"));
+        assert!(!has_formula("NADH"));
+        assert!(!has_formula("H4atp"));
+        assert!(!has_formula("glucose 6-phosphate"));
+        assert!(!has_formula("Fru6-P"));
+    }
+
+    #[test]
+    fn plain_model_names() {
+        assert!(plain_model_name("glucose"));
+        assert!(plain_model_name("Fructose-6-Phosphate"));
+        assert!(!plain_model_name("Extracellular Glucose"));
+        assert!(!plain_model_name("D-glucose [extracellular]"));
+        assert!(!plain_model_name("DHAPc"));
+        assert!(!plain_model_name("GLCex"));
+        assert!(!plain_model_name("DHAP cyt."));
     }
 }
 
@@ -213,8 +369,32 @@ impl PackBuilder {
         map
     }
 
+    /// Chooses each entity's and reaction's synonyms from all the names
+    /// recorded for it ([`pick_synonyms`]).
+    fn fill_synonyms(&mut self) {
+        let mut by_entity: HashMap<u32, Vec<(String, NameHit)>> = HashMap::new();
+        for (n, h) in &self.entity_names {
+            by_entity.entry(h.target).or_default().push((n.clone(), *h));
+        }
+        for (e, names) in by_entity {
+            let label = self.strings.get(self.entities[e as usize].label).to_string();
+            let picked = pick_synonyms(&label, &names);
+            self.entities[e as usize].synonyms = picked.iter().map(|s| self.strings.intern(s)).collect();
+        }
+        let mut by_reaction: HashMap<u32, Vec<(String, NameHit)>> = HashMap::new();
+        for (n, h) in &self.reaction_names {
+            by_reaction.entry(h.target).or_default().push((n.clone(), *h));
+        }
+        for (r, names) in by_reaction {
+            let label = self.strings.get(self.reactions[r as usize].label).to_string();
+            let picked = pick_synonyms(&label, &names);
+            self.reactions[r as usize].synonyms = picked.iter().map(|s| self.strings.intern(s)).collect();
+        }
+    }
+
     /// Indexes everything into a pack.
     pub fn finish(mut self, built: String) -> Pack {
+        self.fill_synonyms();
         let names = NameIndex::build(std::mem::take(&mut self.entity_names), |s| {
             self.strings.intern(s)
         });

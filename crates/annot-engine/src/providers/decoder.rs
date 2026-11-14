@@ -99,6 +99,7 @@ fn decode(pack: &Pack, vocab: &Vocab, reaction: bool, name: Option<&str>, id: &s
                 provider: "decoder",
                 weight,
                 note,
+                complete: false,
             },
         );
     }

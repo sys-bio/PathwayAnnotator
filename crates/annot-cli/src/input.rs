@@ -37,6 +37,15 @@ pub struct Graded {
     pub model: Model,
     pub species: Vec<Key>,
     pub reactions: Vec<Key>,
+    /// The full EC numbers each reaction's annotation gives (four levels,
+    /// no "-"): the curator's enzyme, for judging equivalent answers.
+    pub reaction_ecs: Vec<Vec<String>>,
+    /// Whether each reaction's answer key rests only on EC numbers: none of
+    /// its other ids (KEGG reaction, Rhea, ...) is in the pack. An EC number
+    /// names an enzyme class, not one reaction, so such a key cannot tell
+    /// apart reactions the class covers (glucokinase on alpha-glucose from
+    /// hexokinase on glucose).
+    pub reaction_key_coarse: Vec<bool>,
 }
 
 /// Reads `xml` (model `id`) and resolves its annotations against `pack`.
@@ -49,11 +58,34 @@ pub fn read(id: &str, xml: &str, pack: &Pack) -> Result<Graded, String> {
     let reactions = (0..model.reactions.len())
         .map(|i| w.resolution(pack, Element::Reaction(i)).into())
         .collect();
+    let reaction_ecs = (0..model.reactions.len())
+        .map(|i| {
+            w.identity_uris(Element::Reaction(i))
+                .iter()
+                .filter_map(|u| pack.resolve_resource(u))
+                .filter(|(ns, id)| pack.namespace_prefix(*ns) == "ec-code" && id.split('.').count() == 4 && !id.contains('-'))
+                .map(|(_, id)| id)
+                .collect()
+        })
+        .collect();
+    let reaction_key_coarse = (0..model.reactions.len())
+        .map(|i| {
+            let uris = w.identity_uris(Element::Reaction(i));
+            let specific = uris.iter().any(|u| {
+                pack.resolve_resource(u)
+                    .is_some_and(|(ns, _)| pack.namespace_prefix(ns) != "ec-code")
+                    && pack.find_resource(u).iter().any(|(t, _)| matches!(t, Target::Reaction(_)))
+            });
+            !specific
+        })
+        .collect();
     Ok(Graded {
         id: id.to_string(),
         model,
         species,
         reactions,
+        reaction_ecs,
+        reaction_key_coarse,
     })
 }
 

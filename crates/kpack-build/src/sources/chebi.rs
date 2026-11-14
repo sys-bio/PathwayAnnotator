@@ -123,6 +123,22 @@ pub fn accept_name(kind: &str, status: u8, language: &str) -> bool {
         && NAME_TYPES.contains(&kind)
 }
 
+/// A ChEBI name without HTML markup. The "ASCII name" column still has
+/// some: `(2<i>R</i>)-3-phosphoglyceroyl phosphate`.
+pub fn strip_tags(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut in_tag = false;
+    for c in name.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' if in_tag => in_tag = false,
+            _ if !in_tag => out.push(c),
+            _ => {}
+        }
+    }
+    out.trim().to_string()
+}
+
 /// `CHEBI:15422` or `15422` -> 15422.
 pub fn chebi_number(id: &str) -> Option<u32> {
     id.strip_prefix("CHEBI:").unwrap_or(id).parse().ok()
@@ -298,7 +314,7 @@ pub fn parse(dir: &Path) -> Result<Chebi> {
                 c.compounds.insert(
                     id,
                     Compound {
-                        name: r.text("ascii_name"),
+                        name: r.text("ascii_name").map(|n| strip_tags(&n)),
                         status: r.number("status_id").unwrap_or(0),
                         ..Compound::default()
                     },
@@ -341,7 +357,7 @@ pub fn parse(dir: &Path) -> Result<Chebi> {
             if !accept_name(r.get("type"), status, r.get("language_code")) {
                 return;
             }
-            if let Some(name) = r.text("ascii_name") {
+            if let Some(name) = r.text("ascii_name").map(|n| strip_tags(&n)) {
                 c.names.entry(id).or_default().push(name);
             }
         },
@@ -648,6 +664,13 @@ mod tests {
         assert!(!accept_name("SYNONYM", 9, "en"), "unreviewed submission");
         assert!(!accept_name("SYNONYM", 7, "en"), "deprecated");
         assert!(!accept_name("SYNONYM", 1, "de"));
+    }
+
+    #[test]
+    fn html_is_stripped_from_names() {
+        assert_eq!(strip_tags("(2<i>R</i>)-3-phosphoglyceroyl phosphate"), "(2R)-3-phosphoglyceroyl phosphate");
+        assert_eq!(strip_tags("H<small><sub>4</sub></small>atp"), "H4atp");
+        assert_eq!(strip_tags("plain"), "plain");
     }
 
     #[test]

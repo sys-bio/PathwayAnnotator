@@ -49,6 +49,26 @@ struct Ctx {
     tab: RwSignal<Tab>,
     filter: RwSignal<Filter>,
     selected: RwSignal<Option<Element>>,
+    /// The molecule chip whose card is pinned open: (reaction, position).
+    pinned: RwSignal<Option<(Element, usize)>>,
+    /// The reaction to go back to after jumping from one of its molecule
+    /// chips to the Molecules list.
+    return_to: RwSignal<Option<Element>>,
+}
+
+/// Opens an element in its tab and scrolls it into view.
+fn reveal(ctx: Ctx, el: Element) {
+    ctx.tab.set(if matches!(el, Element::Reaction(_)) { Tab::Reactions } else { Tab::Molecules });
+    ctx.filter.set(Filter::All);
+    ctx.selected.set(Some(el));
+    set_timeout(
+        move || {
+            if let Some(e) = document().get_element_by_id(&dom_id(el)) {
+                e.scroll_into_view();
+            }
+        },
+        Duration::from_millis(50),
+    );
 }
 
 fn dom_id(el: Element) -> String {
@@ -103,6 +123,8 @@ pub fn App() -> impl IntoView {
         tab: RwSignal::new(Tab::Molecules),
         filter: RwSignal::new(Filter::All),
         selected: RwSignal::new(None),
+        pinned: RwSignal::new(None),
+        return_to: RwSignal::new(None),
     };
     provide_context(ctx);
 
@@ -378,7 +400,29 @@ fn ItemList() -> impl IntoView {
             all.into_iter().filter(|el| filter.keeps(&s.status(*el))).collect::<Vec<_>>()
         })
     };
+    // After jumping from a reaction's molecule chip: the way back.
+    let back = move || {
+        let r = ctx.return_to.get()?;
+        if ctx.tab.get() != Tab::Molecules {
+            return None;
+        }
+        let name = ctx.session.with(|s| s.as_ref().map(|s| s.display_name(r)))?;
+        Some(view! {
+            <div class="back">
+                <button on:click=move |_| {
+                    ctx.return_to.set(None);
+                    reveal(ctx, r);
+                }>
+                    <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+                        <path d="M7.5 2.5L4 6l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    {format!(" Back to reaction {name}")}
+                </button>
+            </div>
+        })
+    };
     view! {
+        {back}
         <ul class="items">
             <For each=items key=|el| *el children=move |el| view! { <Item el=el/> }/>
         </ul>
@@ -415,6 +459,17 @@ fn Item(el: Element) -> impl IntoView {
             }
         });
     };
+    let reject_first = move |ev: web_sys::MouseEvent| {
+        ev.stop_propagation();
+        s.update(|s| {
+            if let Some(s) = s
+                && let Some(c) = s.candidates(el).first()
+            {
+                let msg = s.reject(el, c.target);
+                ctx.message.set(Some(msg));
+            }
+        });
+    };
     // Where to check the suggestion, or the current identification.
     let suggestion_link = move || {
         s.with(|s| {
@@ -423,6 +478,17 @@ fn Item(el: Element) -> impl IntoView {
         })
     };
     let identity_link = move || s.with(|s| s.as_ref().and_then(|s| s.ws.identity_uris(el).into_iter().next()));
+    // The most familiar other name of the suggestion: "D-glucopyranose,
+    // also glucose".
+    let suggestion_aka = move || {
+        s.with(|s| {
+            s.as_ref().and_then(|s| {
+                s.candidates(el)
+                    .first()
+                    .and_then(|c| s.synonyms(c.target).into_iter().next())
+            })
+        })
+    };
     let what = move || match status() {
         Status::Identified { label } => view! {
             <span class="what">"Identified as " {check_link(label, identity_link())}</span>
@@ -434,11 +500,15 @@ fn Item(el: Element) -> impl IntoView {
         Status::Suggested { label, level } => view! {
             <span class="what">
                 {check_link(label, suggestion_link())}
+                {suggestion_aka().map(|a| view! { <span class="aka">"also " {a}</span> })}
                 <span class=format!("badge {}", Status::Suggested { label: String::new(), level }.class())>
                     {level_text(level)}
                 </span>
             </span>
             <button class="accept" on:click=accept_first>"Accept"</button>
+            <button class="reject" title="Not this: do not suggest it again" on:click=reject_first>
+                "Reject"
+            </button>
         }
             .into_any(),
         Status::Unknown => view! { <span class="what muted">"No suggestion"</span> }.into_any(),
@@ -476,56 +546,41 @@ fn Item(el: Element) -> impl IntoView {
 }
 
 /// A reaction as "A + B -> C", each molecule a chip coloured by its status.
-/// Clicking a chip shows that molecule.
+/// Hovering (or tabbing to) a chip shows a card about the molecule; clicking
+/// pins the card open. The card can accept the molecule's suggestion in
+/// place, so checking a reaction's molecules never leaves the reaction.
 #[component]
 fn Equation(el: Element) -> impl IntoView {
     let ctx = expect_context::<Ctx>();
     let Element::Reaction(ri) = el else { return ().into_any() };
+    // (position in the reaction, species, label, status class)
     let side = move |role: Role| {
         ctx.session.with(|s| {
             let Some(s) = s else { return Vec::new() };
             s.model.reactions[ri]
                 .participants
                 .iter()
-                .filter(|p| p.role == role)
-                .map(|p| {
+                .enumerate()
+                .filter(|(_, p)| p.role == role)
+                .map(|(k, p)| {
                     let sp = Element::Species(p.species);
                     let n = if p.stoichiometry == 1.0 { String::new() } else { format!("{} ", p.stoichiometry) };
-                    (sp, format!("{n}{}", s.display_name(sp)), s.status(sp).class())
+                    (k, sp, format!("{n}{}", s.display_name(sp)), s.status(sp).class())
                 })
                 .collect::<Vec<_>>()
         })
     };
-    let chip = move |(sp, label, class): (Element, String, &'static str)| {
-        view! {
-            <button
-                class=format!("chip {class}")
-                title="Show this molecule"
-                on:click=move |ev: web_sys::MouseEvent| {
-                    ev.stop_propagation();
-                    ctx.tab.set(Tab::Molecules);
-                    ctx.filter.set(Filter::All);
-                    ctx.selected.set(Some(sp));
-                    set_timeout(
-                        move || {
-                            if let Some(e) = document().get_element_by_id(&dom_id(sp)) {
-                                e.scroll_into_view();
-                            }
-                        },
-                        Duration::from_millis(50),
-                    );
-                }
-            >
-                {label}
-            </button>
-        }
-    };
-    let join = move |items: Vec<(Element, String, &'static str)>| {
+    let join = move |items: Vec<(usize, Element, String, &'static str)>| {
         let n = items.len();
         items
             .into_iter()
             .enumerate()
-            .map(|(i, it)| view! { {chip(it)} {(i + 1 < n).then_some(" + ")} })
+            .map(|(i, (k, sp, label, class))| {
+                view! {
+                    <Chip reaction=el position=k species=sp label=label class=class/>
+                    {(i + 1 < n).then_some(" + ")}
+                }
+            })
             .collect_view()
     };
     view! {
@@ -542,6 +597,108 @@ fn Equation(el: Element) -> impl IntoView {
         .into_any()
 }
 
+/// One molecule in a reaction's equation, with its card.
+#[component]
+fn Chip(reaction: Element, position: usize, species: Element, label: String, class: &'static str) -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    let s = ctx.session;
+    let key = (reaction, position);
+    let pinned = move || ctx.pinned.get() == Some(key);
+    let card_id = format!("card-{}-{position}", dom_id(reaction));
+    let info = move || s.with(|s| s.as_ref().map(|s| s.molecule_info(species)));
+    let accept = move |ev: web_sys::MouseEvent| {
+        ev.stop_propagation();
+        s.update(|s| {
+            if let Some(s) = s
+                && let Some(t) = s.molecule_info(species).target
+            {
+                let msg = s.accept(species, t);
+                ctx.message.set(Some(msg));
+            }
+        });
+    };
+    let reject = move |ev: web_sys::MouseEvent| {
+        ev.stop_propagation();
+        s.update(|s| {
+            if let Some(s) = s
+                && let Some(t) = s.molecule_info(species).target
+            {
+                let msg = s.reject(species, t);
+                ctx.message.set(Some(msg));
+            }
+        });
+    };
+    let show_in_list = move |ev: web_sys::MouseEvent| {
+        ev.stop_propagation();
+        ctx.pinned.set(None);
+        ctx.return_to.set(Some(reaction));
+        reveal(ctx, species);
+    };
+    let card = move || {
+        let Some(i) = info() else { return ().into_any() };
+        let status = match &i.status {
+            Status::Identified { label } => view! { <p>"Identified as " <b>{label.clone()}</b></p> }.into_any(),
+            Status::AnnotatedElsewhere => view! { <p>"Annotated with something outside our database"</p> }.into_any(),
+            Status::Suggested { label, level } => view! {
+                <p>
+                    "Suggested: " <b>{label.clone()}</b>
+                    <span class=format!("badge {}", i.status.class())>{level_text(*level)}</span>
+                </p>
+            }
+                .into_any(),
+            Status::Unknown => view! { <p class="muted">"No suggestion"</p> }.into_any(),
+        };
+        let suggested = matches!(i.status, Status::Suggested { .. });
+        view! {
+            <div class="chip-card-body">
+                <div class="chip-card-title">
+                    <b>{i.name.clone()}</b>
+                    {i.id.clone().map(|id| view! { <span class="id">{id}</span> })}
+                    {i.compartment.clone().map(|c| view! { <span class="muted">" in " {c}</span> })}
+                </div>
+                {status}
+                {(!i.synonyms.is_empty())
+                    .then(|| {
+                        let few: Vec<String> = i.synonyms.iter().take(4).cloned().collect();
+                        view! { <p class="aka-list">"Also known as: " {few.join("; ")}</p> }
+                    })}
+                <div class="chip-card-actions">
+                    {i.link.clone().map(|url| check_link("Check in database".into(), Some(url)))}
+                    {suggested
+                        .then(|| {
+                            view! {
+                                <button class="accept" on:click=accept>"Accept"</button>
+                                <button class="reject" title="Not this: do not suggest it again" on:click=reject>
+                                    "Reject"
+                                </button>
+                            }
+                        })}
+                    <button class="link" on:click=show_in_list>"Show in Molecules list"</button>
+                </div>
+            </div>
+        }
+            .into_any()
+    };
+    view! {
+        <span class="chip-wrap" class:pinned=pinned>
+            <button
+                class=format!("chip {class}")
+                aria-expanded=move || pinned().to_string()
+                aria-controls=card_id.clone()
+                on:click=move |ev: web_sys::MouseEvent| {
+                    ev.stop_propagation();
+                    ctx.pinned.update(|p| *p = if *p == Some(key) { None } else { Some(key) });
+                }
+            >
+                {label}
+            </button>
+            <span class="chip-card" id=card_id.clone() on:click=|ev: web_sys::MouseEvent| ev.stop_propagation()>
+                {card}
+            </span>
+        </span>
+    }
+}
+
 /// The candidates for an element, with their evidence, and its existing
 /// annotation.
 #[component]
@@ -551,6 +708,7 @@ fn Details(el: Element) -> impl IntoView {
     let rows = move || {
         s.with(|s| {
             let Some(s) = s else { return Vec::new() };
+            let current = s.identified_as(el);
             s.candidates(el)
                 .iter()
                 .take(5)
@@ -559,7 +717,10 @@ fn Details(el: Element) -> impl IntoView {
                         c.target,
                         s.label(c.target),
                         s.links(c.target),
+                        s.synonyms(c.target),
                         c.evidence.iter().map(|e| e.note.clone()).collect::<Vec<_>>(),
+                        // Is it the current identification, and is there one?
+                        (current.contains(&c.target), !current.is_empty()),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -596,10 +757,59 @@ fn Details(el: Element) -> impl IntoView {
                 }
                 rows.into_iter()
                     .enumerate()
-                    .map(|(i, (target, label, links, notes))| {
+                    .map(|(i, (target, label, links, aka, notes, (accepted, identified)))| {
                         let main = links.first().map(|(_, url)| url.clone());
+                        let action = if accepted {
+                            view! {
+                                <span class="accepted" role="status">
+                                    <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+                                        <path d="M2 6.5l2.5 2.5L10 3.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+                                    </svg>
+                                    " Accepted"
+                                </span>
+                            }
+                                .into_any()
+                        } else {
+                            view! {
+                                <span class="cand-actions">
+                                    <button
+                                        class="accept"
+                                        title=if identified {
+                                            "Replace the current identification with this one"
+                                        } else {
+                                            "Annotate the model with this"
+                                        }
+                                        on:click=move |_| {
+                                            s.update(|s| {
+                                                if let Some(s) = s {
+                                                    let msg = s.accept(el, target);
+                                                    ctx.message.set(Some(msg));
+                                                }
+                                            })
+                                        }
+                                    >
+                                        {if identified { "Use this instead" } else { "Accept" }}
+                                    </button>
+                                    <button
+                                        class="reject"
+                                        title="Not this: do not suggest it again"
+                                        on:click=move |_| {
+                                            s.update(|s| {
+                                                if let Some(s) = s {
+                                                    let msg = s.reject(el, target);
+                                                    ctx.message.set(Some(msg));
+                                                }
+                                            })
+                                        }
+                                    >
+                                        "Reject"
+                                    </button>
+                                </span>
+                            }
+                                .into_any()
+                        };
                         view! {
-                            <div class="cand">
+                            <div class="cand" class:is-accepted=accepted>
                                 <div class="cand-head">
                                     <span class="rank">{i + 1}</span>
                                     {check_link(label, main)}
@@ -615,20 +825,10 @@ fn Details(el: Element) -> impl IntoView {
                                             })
                                             .collect_view()}
                                     </span>
-                                    <button
-                                        class="accept"
-                                        on:click=move |_| {
-                                            s.update(|s| {
-                                                if let Some(s) = s {
-                                                    let msg = s.accept(el, target);
-                                                    ctx.message.set(Some(msg));
-                                                }
-                                            })
-                                        }
-                                    >
-                                        "Accept"
-                                    </button>
+                                    {action}
                                 </div>
+                                {(!aka.is_empty())
+                                    .then(|| view! { <p class="aka-list">"Also known as: " {aka.join("; ")}</p> })}
                                 <ul class="evidence">
                                     {notes.into_iter().map(|n| view! { <li>{n}</li> }).collect_view()}
                                 </ul>
@@ -637,6 +837,40 @@ fn Details(el: Element) -> impl IntoView {
                     })
                     .collect_view()
                     .into_any()
+            }}
+            {move || {
+                let rejected = s.with(|s| s.as_ref().map(|s| s.rejected(el)).unwrap_or_default());
+                (!rejected.is_empty())
+                    .then(|| {
+                        view! {
+                            <h4>"Rejected"</h4>
+                            <ul class="rejected">
+                                {rejected
+                                    .into_iter()
+                                    .map(|(target, label)| {
+                                        view! {
+                                            <li>
+                                                <span>{label}</span>
+                                                <button
+                                                    class="link"
+                                                    on:click=move |_| {
+                                                        s.update(|s| {
+                                                            if let Some(s) = s {
+                                                                let msg = s.restore(el, target);
+                                                                ctx.message.set(Some(msg));
+                                                            }
+                                                        })
+                                                    }
+                                                >
+                                                    "Restore"
+                                                </button>
+                                            </li>
+                                        }
+                                    })
+                                    .collect_view()}
+                            </ul>
+                        }
+                    })
             }}
         </div>
     }

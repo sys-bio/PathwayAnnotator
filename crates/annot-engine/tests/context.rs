@@ -29,6 +29,8 @@ fn species(id: &str, name: Option<&str>) -> Species {
         id: id.into(),
         name: name.map(Into::into),
         compartment: Some("cell".into()),
+        known: None,
+        rejected: Vec::new(),
     }
 }
 
@@ -62,11 +64,15 @@ fn model() -> Model {
                 id: "J1".into(),
                 name: None,
                 participants: vec![part(0, Reactant), part(1, Reactant), part(3, Product), part(2, Product)],
+                known: None,
+                rejected: Vec::new(),
             },
             Reaction {
                 id: "J2".into(),
                 name: None,
                 participants: vec![part(3, Reactant), part(4, Product)],
+                known: None,
+                rejected: Vec::new(),
             },
         ],
     }
@@ -103,4 +109,89 @@ fn named_species_keep_their_names() {
     let s = annotate(&p, &model());
     assert_eq!(s.species[0][0].target, entity(&p, "glc__D"));
     assert_eq!(s.species[1][0].target, entity(&p, "atp"));
+}
+
+#[test]
+fn confirmed_molecules_make_an_exact_reaction_match_high() {
+    let p = pack();
+    let mut m = model();
+    // Not confirmed: the reactions are at most likely.
+    let before = annotate(&p, &m);
+    assert_ne!(annot_engine::confidence(&before.reactions[0]), Some(annot_engine::Confidence::High));
+
+    // The user confirms all four molecules of J1 (glucose + ATP -> G6P + ADP).
+    for (i, bigg) in [(0, "glc__D"), (1, "atp"), (2, "adp"), (3, "g6p")] {
+        let Target::Entity(e) = entity(&p, bigg) else { unreachable!() };
+        m.species[i].known = Some(e);
+    }
+    let after = annotate(&p, &m);
+    let first = &after.reactions[0][0];
+    assert_eq!(first.target, reaction(&p, "HEX1"));
+    assert!(first.evidence.iter().any(|e| e.complete), "{:?}", first.evidence);
+    assert_eq!(annot_engine::confidence(&after.reactions[0]), Some(annot_engine::Confidence::High));
+    // J2 (G6P -> S4) is not complete: S4 is not confirmed.
+    assert!(!after.reactions[1].iter().flat_map(|c| &c.evidence).any(|e| e.complete));
+}
+
+fn entity_id(p: &Pack, bigg: &str) -> kpack::EntityId {
+    match entity(p, bigg) {
+        Target::Entity(e) => e,
+        t => panic!("{t:?}"),
+    }
+}
+
+#[test]
+fn a_confirmed_reaction_pins_down_its_remaining_molecule() {
+    let p = pack();
+    let mut m = model();
+    // Glucose, ATP and ADP confirmed; J1 confirmed as hexokinase; S3 not.
+    for (i, bigg) in [(0, "glc__D"), (1, "atp"), (2, "adp")] {
+        m.species[i].known = Some(entity_id(&p, bigg));
+    }
+    let Target::Reaction(hex1) = reaction(&p, "HEX1") else { unreachable!() };
+    m.reactions[0].known = Some(hex1);
+    let s = annotate(&p, &m);
+    let first = &s.species[3][0];
+    assert_eq!(first.target, entity(&p, "g6p"));
+    assert!(
+        first.evidence.iter().any(|e| e.complete && e.note.contains("which is identified as")),
+        "{:?}",
+        first.evidence
+    );
+    assert_eq!(annot_engine::confidence(&s.species[3]), Some(annot_engine::Confidence::High));
+}
+
+#[test]
+fn a_pinned_molecule_is_not_complete_when_the_line_up_rests_on_guesses() {
+    let p = pack();
+    let mut m = model();
+    // J1 confirmed, but its other molecules only guessed from their names.
+    let Target::Reaction(hex1) = reaction(&p, "HEX1") else { unreachable!() };
+    m.reactions[0].known = Some(hex1);
+    let s = annotate(&p, &m);
+    assert_eq!(s.species[3][0].target, entity(&p, "g6p"));
+    assert!(!s.species[3][0].evidence.iter().any(|e| e.complete));
+}
+
+#[test]
+fn a_rejected_suggestion_does_not_come_back() {
+    let p = pack();
+    let mut m = model();
+    let g6p = entity_id(&p, "g6p");
+    m.species[3].rejected = vec![g6p];
+    let s = annotate(&p, &m);
+    assert!(
+        !s.species[3].iter().any(|c| c.target == Target::Entity(g6p)),
+        "{:?}",
+        s.species[3]
+    );
+    // Nor is it reasoned from: with S3 not G6P, nothing makes S4 F6P via
+    // the isomerase.
+    assert!(!s.species[4].iter().any(|c| c.target == entity(&p, "f6p") && c.score > 1.0));
+
+    // Rejected reactions likewise.
+    let Target::Reaction(hex1) = reaction(&p, "HEX1") else { unreachable!() };
+    m.reactions[0].rejected = vec![hex1];
+    let s = annotate(&p, &m);
+    assert!(!s.reactions[0].iter().any(|c| c.target == Target::Reaction(hex1)));
 }

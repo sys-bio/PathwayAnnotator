@@ -540,6 +540,32 @@ trunk serve --open            # needs packs/kpack.bin at the repository root
   check is exactly what gets saved.
 - Every row has an explicit "Details / Hide" control (the whole row also
   toggles, but nothing showed that).
+- Accepting from the details panel shows its result in the panel: the
+  accepted candidate is highlighted and marked "Accepted", the current
+  annotation appears above, and the other candidates offer "Use this
+  instead", which replaces the identification in one undoable step
+  (`Workspace::replace_identity`: removes the `is` / `isVersionOf` terms
+  the pack knows, keeps the rest). Before this, a second Accept added a
+  second identity beside the first, and the only feedback was the message
+  at the bottom of the page.
+- Synonyms: each suggestion shows its most familiar other name in the row
+  ("D-glucopyranose, also glucose") and all of them in the details ("Also
+  known as: glucose; D-glucose; Grape sugar; Dextrose; ..."). They come
+  from `Entity::synonyms` / `Reaction::synonyms` in the pack (format
+  version 5), chosen by `builder::pick_synonyms`: database names (ChEBI,
+  BiGG) first; names found only in models must appear in at least two
+  and be plain (no brackets, location words or glued location endings);
+  no ids, charge forms, chemical formulas or names over 40 characters;
+  full names before abbreviations, then by model usage and readability.
+  ChEBI names are now stripped of the HTML its "ASCII name" column still
+  carries.
+- Molecule chips in a reaction's equation: hovering (or tabbing to) a
+  chip shows a card with the molecule's name, id, compartment, status,
+  first synonyms, a database link, Accept (when it has a suggestion) and
+  "Show in Molecules list"; clicking a chip pins its card open (touch
+  screens). Checking a reaction's molecules no longer leaves the reaction.
+  If the user does jump to the Molecules list, a sticky "Back to reaction
+  ..." button returns to the reaction, opened and scrolled into view.
 - Serving `dist/` with another web server while running `trunk build`
   fails on Windows (the folder is in use); `trunk serve` avoids it.
 
@@ -552,12 +578,51 @@ Found while testing in the browser, and fixed in the engine:
   phosphatase tied with the kinase. They now count a little.
 Both raised novel-model reactions from 82.2% to 82.7% right first.
 
-Known issues / next:
+Learning from the user (2026-11-14):
+- After every edit the session re-runs the engine with what is confirmed:
+  `Species::known` and `Reaction::known` from the model's annotations
+  (accepted or pre-existing). When a reaction's ids fit several BiGG
+  compartment variants equally, the plainest BiGG id stands for them
+  (status: "phosphoglycerate kinase (and 4 compartment variants)").
+- A confirmed reaction pins down its unconfirmed molecules
+  (`context::pinned_by_reactions`): the database reaction is lined up
+  with the model's using the molecules already known, and what is left on
+  a molecule's side is evidence for it; one left over, with every other
+  reactant and product confirmed, is complete (High). In the example,
+  confirming vPGK as phosphoglycerate kinase takes s9 from uncertain to a
+  High 3-phosphoglycerate.
+- Benchmark scenario `bench --confirmed-reactions`: every reaction given;
+  species right first 91.0% on novel models (90.8% without), 74.6% of
+  suggestions High (70.7%), High still right 99.3%. Across all test models
+  species right first dips 91.9% -> 91.6%: a confirmed reaction pushes
+  BiGG's form of a molecule (D-glucopyranose 6-phosphate) where curators
+  often use another (alpha-D-glucose 6-phosphate).
+- Reject: a rejected suggestion is removed after every provider (so no
+  later provider reasons from it) and inside context's own rounds
+  (`Species::rejected`, `Reaction::rejected`). Rejections live in the
+  session, not the SBML; Details lists them with Restore. Buttons in the
+  row, on each candidate and in the molecule chip card.
+
+Known issues / next (in order):
+- Rename an element's SBML id (requested 2026-11-14), for example giving
+  s9 a meaningful id once it is identified. A bigger job: every reference
+  must follow, or the model breaks. In SBML: speciesReference/@species,
+  modifierSpeciesReference/@species, MathML `<ci>` in kinetic laws, rules,
+  initial assignments, event triggers, delays, priorities and assignments,
+  and constraints (but not where a kinetic law's local parameter of the
+  same name shadows it), rule and event assignment variables,
+  compartment references, conversion factors; the Layout package's glyph
+  references (species and reaction glyphs point at ids); and `metaid`s are
+  separate and stay. The new id must be a valid SId and unique in the
+  model. Undoable as one step. For Antimony-loaded models, the same rename
+  in the Antimony text if Antimony export is added. sbml-io keeps MathML as
+  a tree, so the rename can be a tree walk rather than text replacement.
 - "Accept all" is undone one element at a time; it should be one step.
-- Suggestions are computed once on load; accepted answers should become
-  anchors and the engine re-run.
 - Some BiGG labels are poor ("R_glucose_transport__uniport_", "PGKf");
   prefer a ChEBI/Rhea name or a cleaned label for display.
+- A molecule card opened near the bottom of the page needed extra space
+  below the list (now padded); a card that opens upward when there is no
+  room below would be better.
 - No search for an element the engine has nothing for (OLS / UniProt),
   no keyboard shortcuts, no SBO / qualifier editing in the UI yet.
 - Publishing to GitHub Pages needs a CI job that builds the pack (BiGG,
@@ -703,6 +768,36 @@ or a three-way split once there are more.
 
 For the app: High can be offered for one-click acceptance (or bulk
 "accept all high"), Likely shown for a quick check, Uncertain flagged.
+
+### Confirmed molecules and complete reaction matches (2026-11-14)
+
+- `annot_engine::Species::known`: a species' confirmed identity (accepted
+  by the user, or already annotated in the model). Context treats it as a
+  certain anchor. The app sets it and re-runs the engine after every edit;
+  the benchmark leaves it empty (its answers come from the annotations).
+- A reaction whose reactants and products are all *confirmed* (not just
+  guessed) and match exactly one database reaction (all on the right
+  sides, nothing missing, at most two unshown cofactors such as H+ and
+  water) gets evidence marked `complete`, and is High. Using guessed
+  molecules instead was tried first: High reactions were then right only
+  95.5% of the time, since one wrong guess makes a "complete" match
+  complete for the wrong molecules.
+- New benchmark scenario `bench --confirmed-species`: every species is
+  given its true identity, as if the user had confirmed them all.
+  Reactions right first: 84.9% on novel models (82.7% without).
+- High reactions in that scenario: right 96.0% strictly, 99.3% (273 of
+  275 on novel models) when only answer keys that name a specific
+  reaction are counted. The rest rest on EC numbers alone: curators wrote
+  a KEGG reaction id the pack does not know plus EC numbers, so the key
+  falls back to a generic reaction ("hexokinase" for EC 2.7.1.1) while the
+  engine finds the exact one (alpha-glucokinase for "ATP + alpha-D-glucose
+  -> ADP + alpha-D-glucose 6-phosphate", KEGG R01786). The report shows
+  both figures; `Graded::reaction_key_coarse` marks such keys.
+- In the example model, confirming the molecules lifts 5 of 8 reactions to
+  High. The others stay Likely for real reasons: an unconfirmed molecule
+  (s9), several transporters for glucose, and G6P accepted as
+  alpha-D-glucose 6-phosphate while BiGG's hexokinase makes D-glucose
+  6-phosphate.
 
 Original plan:
 

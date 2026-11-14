@@ -75,15 +75,36 @@ impl Provider for Context {
     }
 
     fn run(&self, pack: &Pack, model: &Model, out: &mut Suggestions) {
-        let anchors1 = anchors(out, ANCHOR_MIN);
+        // Species the user confirmed (or the model already annotated) are
+        // anchors whatever the other providers say.
+        let confirmed: BTreeMap<usize, EntityId> = model
+            .species
+            .iter()
+            .enumerate()
+            .filter_map(|(i, s)| s.known.map(|e| (i, e)))
+            .collect();
+        let mut anchors1 = anchors(out, ANCHOR_MIN);
+        anchors1.extend(confirmed.iter().map(|(i, e)| (*i, *e)));
         let learners: BTreeSet<usize> = (0..model.species.len()).filter(|i| !anchors1.contains_key(i)).collect();
 
-        // Round 1: what context says about the species that are not anchors.
+        let rejected = |i: usize, e: EntityId| model.species[i].rejected.contains(&e);
+
+        // Round 1: what context says about the species that are not anchors,
+        // and what confirmed reactions say about their unconfirmed species.
         let first = species_evidence(pack, model, &anchors1, &learners);
         let mut trial = out.clone();
         for (i, map) in &first {
             for (e, (w, note)) in map {
-                Suggestions::add(&mut trial.species[*i], Target::Entity(*e), ev(*w, note.clone()));
+                if !rejected(*i, *e) {
+                    Suggestions::add(&mut trial.species[*i], Target::Entity(*e), ev(*w, note.clone(), false));
+                }
+            }
+        }
+        for (i, map) in pinned_by_reactions(pack, model, &anchors1, &confirmed) {
+            for (e, (w, note, complete)) in map {
+                if !rejected(i, e) {
+                    Suggestions::add(&mut trial.species[i], Target::Entity(e), ev(w, note, complete));
+                }
             }
         }
         let mut anchors2 = anchors1.clone();
@@ -95,12 +116,46 @@ impl Provider for Context {
         let second = species_evidence(pack, model, &anchors2, &learners);
         for (i, map) in second {
             for (e, (w, note)) in map {
-                Suggestions::add(&mut out.species[i], Target::Entity(e), ev(w, note));
+                if !rejected(i, e) {
+                    Suggestions::add(&mut out.species[i], Target::Entity(e), ev(w, note, false));
+                }
+            }
+        }
+        for (i, map) in pinned_by_reactions(pack, model, &anchors2, &confirmed) {
+            for (e, (w, note, complete)) in map {
+                if !rejected(i, e) {
+                    Suggestions::add(&mut out.species[i], Target::Entity(e), ev(w, note, complete));
+                }
             }
         }
         for (ri, r) in model.reactions.iter().enumerate() {
             let known = known_participants(model, ri, &anchors2, None);
-            for f in fits(pack, &known, spans_compartments(model, ri)) {
+            let fits = fits(pack, &known, spans_compartments(model, ri));
+            // A complete match: every reactant and product is confirmed (not
+            // just guessed: one wrong guess makes a "complete" match
+            // complete for the wrong molecules), and exactly one database
+            // reaction accounts for all of them, on the right sides, with
+            // nothing else but cofactors left.
+            let all_known = r
+                .participants
+                .iter()
+                .filter(|p| p.role != Role::Modifier)
+                .all(|p| confirmed.contains_key(&p.species));
+            let complete: Vec<ReactionId> = if all_known {
+                fits.iter()
+                    .filter(|f| {
+                        f.missing == 0
+                            && f.matched + f.currency_matched == known.len()
+                            && leftover_core(pack, f) == 0
+                            && f.currency_left <= MAX_UNSHOWN_COFACTORS
+                    })
+                    .map(|f| f.reaction)
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            let the_complete = (complete.len() == 1).then(|| complete[0]);
+            for f in fits {
                 let unknown = r
                     .participants
                     .iter()
@@ -109,10 +164,12 @@ impl Provider for Context {
                 let extra = leftover_core(pack, &f).saturating_sub(unknown);
                 // Matched cofactors count a little: "F6P + ATP -> FBP + ADP"
                 // is the kinase, not the phosphatase run backwards.
+                let is_complete = the_complete == Some(f.reaction);
                 let w = 0.8 + 0.6 * f.matched as f32 + 0.15 * f.currency_matched as f32
                     - 0.6 * f.missing as f32
                     - 0.2 * extra as f32
-                    - 0.1 * f.currency_left as f32;
+                    - 0.1 * f.currency_left as f32
+                    + if is_complete { COMPLETE_BONUS } else { 0.0 };
                 if w <= 0.0 {
                     continue;
                 }
@@ -121,26 +178,118 @@ impl Provider for Context {
                     .filter(|(e, _)| !is_currency(pack, *e))
                     .map(|(e, _)| pack.str(pack.entity(*e).label))
                     .collect();
-                let note = format!(
-                    "its species {} fit {} ({} matched{})",
-                    names.join(", "),
-                    pack.str(pack.reaction(f.reaction).label),
-                    f.matched,
-                    if f.missing > 0 { format!(", {} missing", f.missing) } else { String::new() }
-                );
-                Suggestions::add(&mut out.reactions[ri], Target::Reaction(f.reaction), ev(w, note));
+                let note = if is_complete {
+                    format!(
+                        "all {} of its molecules are identified and match {} exactly, and no other reaction",
+                        known.len(),
+                        pack.str(pack.reaction(f.reaction).label)
+                    )
+                } else {
+                    format!(
+                        "its species {} fit {} ({} matched{})",
+                        names.join(", "),
+                        pack.str(pack.reaction(f.reaction).label),
+                        f.matched,
+                        if f.missing > 0 { format!(", {} missing", f.missing) } else { String::new() }
+                    )
+                };
+                Suggestions::add(&mut out.reactions[ri], Target::Reaction(f.reaction), ev(w, note, is_complete));
             }
         }
     }
 }
 
-fn ev(weight: f32, note: String) -> Evidence {
+fn ev(weight: f32, note: String, complete: bool) -> Evidence {
     Evidence {
         provider: "context",
         weight,
         note,
+        complete,
     }
 }
+
+/// Evidence for a species from a confirmed reaction with one molecule left
+/// on its side.
+pub const PINNED_ONE: f32 = 2.5;
+/// Evidence for each of two molecules left on its side.
+pub const PINNED_TWO: f32 = 0.8;
+/// Evidence for a lone cofactor left on its side.
+pub const PINNED_CURRENCY: f32 = 1.0;
+
+/// What confirmed reactions say about their unconfirmed species: species ->
+/// entity -> (weight, note, complete).
+///
+/// The database reaction is lined up with the model's (both directions are
+/// tried; the one matching more known molecules wins), and what is left on
+/// an unconfirmed species' side is evidence for it. One molecule left is
+/// strong evidence; it is complete when every other reactant and product of
+/// the reaction is confirmed, since the line-up then rests on nothing
+/// guessed ("BPG + ADP -> s9 + ATP", confirmed as phosphoglycerate kinase,
+/// makes s9 3-phosphoglycerate).
+fn pinned_by_reactions(
+    pack: &Pack,
+    model: &Model,
+    anchors: &BTreeMap<usize, EntityId>,
+    confirmed: &BTreeMap<usize, EntityId>,
+) -> BTreeMap<usize, BTreeMap<EntityId, (f32, String, bool)>> {
+    let mut out: BTreeMap<usize, BTreeMap<EntityId, (f32, String, bool)>> = BTreeMap::new();
+    for (ri, r) in model.reactions.iter().enumerate() {
+        let Some(rid) = r.known else { continue };
+        for p in &r.participants {
+            if confirmed.contains_key(&p.species) {
+                continue;
+            }
+            let side = match p.role {
+                Role::Reactant => Side::Left,
+                Role::Product => Side::Right,
+                Role::Modifier => continue,
+            };
+            let known = known_participants(model, ri, anchors, Some(p.species));
+            let Some(f) = [false, true]
+                .into_iter()
+                .filter_map(|flip| fit(pack, &known, rid, flip))
+                .max_by(|a, b| a.score.total_cmp(&b.score))
+            else {
+                continue;
+            };
+            let on_side: Vec<EntityId> = f.leftover.iter().filter(|(_, s)| *s == side).map(|(e, _)| *e).collect();
+            let core: Vec<EntityId> = on_side.iter().copied().filter(|e| !is_currency(pack, *e)).collect();
+            let others_confirmed = r
+                .participants
+                .iter()
+                .filter(|q| q.role != Role::Modifier && q.species != p.species)
+                .all(|q| confirmed.contains_key(&q.species));
+            let (picked, weight, complete) = match core.len() {
+                1 => (core, PINNED_ONE, others_confirmed && f.missing == 0),
+                2 => (core, PINNED_TWO, false),
+                0 if on_side.len() == 1 => (on_side, PINNED_CURRENCY, false),
+                _ => continue,
+            };
+            let role = if side == Side::Left { "substrate" } else { "product" };
+            let note = format!(
+                "in reaction \"{}\", which is identified as {}, it is the remaining {role}",
+                r.name.as_deref().unwrap_or(&r.id),
+                pack.str(pack.reaction(rid).label)
+            );
+            let mine = out.entry(p.species).or_default();
+            for e in picked {
+                let slot = mine.entry(e).or_insert((0.0, String::new(), false));
+                if weight > slot.0 {
+                    *slot = (weight, note.clone(), complete || slot.2);
+                } else {
+                    slot.2 |= complete;
+                }
+            }
+        }
+    }
+    out
+}
+
+/// A complete match may leave this many of the database reaction's
+/// cofactors unshown in the model (H+ and water, typically).
+pub const MAX_UNSHOWN_COFACTORS: usize = 2;
+/// Extra weight for a complete match.
+pub const COMPLETE_BONUS: f32 = 0.5;
 
 fn is_currency(pack: &Pack, e: EntityId) -> bool {
     pack.entity(e).flags.contains(EntityFlags::CURRENCY)

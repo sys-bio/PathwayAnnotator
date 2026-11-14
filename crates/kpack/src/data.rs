@@ -151,6 +151,10 @@ pub struct Entity {
     /// "Is a kind of": more general entities in the pack (from ChEBI's
     /// "is a"). Sorted.
     pub generalizes_to: Vec<EntityId>,
+    /// Other names people know it by, most familiar first, for showing
+    /// beside the label ("D-glucose" for "D-glucopyranose"). A short list;
+    /// the full dictionary is [`Pack::names`].
+    pub synonyms: Vec<StrId>,
     /// For complexes: "has part".
     pub parts: Vec<EntityId>,
     /// For proteins and genes.
@@ -229,6 +233,8 @@ pub struct Reaction {
     /// Enzymes, per organism (from gene-protein-reaction rules).
     pub enzymes: Vec<(OrgId, EntityId)>,
     pub pathways: Vec<PathwayId>,
+    /// Other names people know it by, most familiar first ("hexokinase").
+    pub synonyms: Vec<StrId>,
     pub sources: Sources,
 }
 

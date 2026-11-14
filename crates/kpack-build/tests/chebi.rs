@@ -136,3 +136,21 @@ fn header_attributes_chebi() {
     assert_eq!(s.license, "CC BY 4.0");
     assert!(s.notice.as_deref().unwrap().contains("the version of ChEBI is 257"));
 }
+
+#[test]
+fn familiar_names_become_synonyms() {
+    let (p, _) = build();
+    let glc = entity(&p, "glc__D");
+    let e = p.entity(glc);
+    let synonyms: Vec<&str> = e.synonyms.iter().map(|s| p.str(*s)).collect();
+    // BiGG calls it D-glucopyranose; people know it as D-glucose.
+    assert!(synonyms.iter().any(|s| s.eq_ignore_ascii_case("D-glucose")), "{synonyms:?}");
+    // Not the label again, no brand names, at most a handful.
+    assert!(!synonyms.iter().any(|s| kpack::normalize_name(s) == kpack::normalize_name(p.str(e.label))));
+    assert!(!synonyms.contains(&"Rapilose"));
+    assert!(synonyms.len() <= kpack_build::builder::MAX_SYNONYMS);
+    // ATP's charge forms are not synonyms of ATP.
+    let atp = p.entity(entity(&p, "atp"));
+    let atp_syn: Vec<&str> = atp.synonyms.iter().map(|s| p.str(*s)).collect();
+    assert!(!atp_syn.iter().any(|s| kpack::normalize_name(s) == "atp"), "{atp_syn:?}");
+}

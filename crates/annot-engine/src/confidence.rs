@@ -70,7 +70,11 @@ pub fn confidence(list: &[Candidate]) -> Option<Confidence> {
     let second = list.get(1).map_or(0.0, |c| c.score);
     let alone = list.len() == 1;
     let clear = second <= CLEAR_LEAD * score;
+    // A reaction whose every molecule is identified and matches one
+    // database reaction exactly is High, whatever else the evidence is.
+    let complete = first.evidence.iter().any(|e| e.complete);
     Some(match basis(first) {
+        _ if complete && clear => Confidence::High,
         Basis::Name if alone && score >= HIGH_NAME => Confidence::High,
         Basis::Name if score >= LIKELY_NAME => Confidence::Likely,
         Basis::Decoded if clear && score >= HIGH_DECODED => Confidence::High,
@@ -94,6 +98,7 @@ mod tests {
                 provider,
                 weight: score,
                 note: String::new(),
+                complete: false,
             }],
         }
     }

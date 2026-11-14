@@ -1,6 +1,7 @@
 //! The state of one annotation session: the model, the pack, the engine's
 //! suggestions, and what each element's status is. No UI code here.
 
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use annot_engine::{Candidate, Confidence, Model, Suggestions, annotate, confidence};
@@ -33,6 +34,21 @@ impl Status {
     }
 }
 
+/// What the card on a molecule chip shows.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MoleculeInfo {
+    pub name: String,
+    /// The SBML id, if it differs from the name.
+    pub id: Option<String>,
+    pub compartment: Option<String>,
+    pub status: Status,
+    /// What it is identified as, else the engine's first suggestion.
+    pub target: Option<Target>,
+    pub synonyms: Vec<String>,
+    /// Where to check it: its annotation, else the suggestion's entry.
+    pub link: Option<String>,
+}
+
 /// Counts for the overview.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Counts {
@@ -54,26 +70,77 @@ pub struct Session {
     /// (each one reads the element's annotation XML).
     species_status: Vec<Status>,
     reaction_status: Vec<Status>,
+    /// Suggestions the user rejected, per element. Kept for the session
+    /// only: they are not written into the model.
+    rejected: BTreeMap<Element, Vec<Target>>,
 }
 
 impl Session {
     pub fn new(pack: Rc<Pack>, ws: Workspace, file_name: String) -> Session {
         let model = ws.engine_model();
-        let suggestions = annotate(&pack, &model);
         let mut s = Session {
             pack,
             ws,
             model,
-            suggestions,
+            suggestions: Suggestions::default(),
             file_name,
             species_status: Vec::new(),
             reaction_status: Vec::new(),
+            rejected: BTreeMap::new(),
         };
         s.refresh();
         s
     }
 
+    /// Re-runs the engine with what is now known, then recomputes every
+    /// status. Called after every edit: each molecule and reaction the user
+    /// confirms becomes certain for the engine, so the elements around it are
+    /// suggested better (a confirmed reaction pins down its unconfirmed
+    /// molecules; a reaction whose molecules are all confirmed and match one
+    /// database reaction exactly becomes high confidence). Rejected
+    /// suggestions are passed on so they never come back.
     fn refresh(&mut self) {
+        for i in 0..self.model.species.len() {
+            let el = Element::Species(i);
+            let known = match self.ws.resolution(&self.pack, el) {
+                Resolution::Known { targets, .. } => match targets.as_slice() {
+                    [Target::Entity(e)] => Some(*e),
+                    _ => None,
+                },
+                _ => None,
+            };
+            let rejected = self.rejected_entities(el);
+            let s = &mut self.model.species[i];
+            s.known = known;
+            s.rejected = rejected;
+        }
+        for i in 0..self.model.reactions.len() {
+            let el = Element::Reaction(i);
+            // A reaction's Rhea / EC / KEGG ids often fit several BiGG
+            // variants (one per compartment) equally; any of them pins down
+            // the molecules, since compartments are not compared.
+            let known = match self.ws.resolution(&self.pack, el) {
+                Resolution::Known { targets, .. } => match self.representative(&targets) {
+                    Some(Target::Reaction(r)) => Some(r),
+                    _ => None,
+                },
+                _ => None,
+            };
+            let rejected = self
+                .rejected
+                .get(&el)
+                .into_iter()
+                .flatten()
+                .filter_map(|t| match t {
+                    Target::Reaction(r) => Some(*r),
+                    _ => None,
+                })
+                .collect();
+            let r = &mut self.model.reactions[i];
+            r.known = known;
+            r.rejected = rejected;
+        }
+        self.suggestions = annotate(&self.pack, &self.model);
         self.species_status = self.species().into_iter().map(|el| self.compute_status(el)).collect();
         self.reaction_status = self.reactions().into_iter().map(|el| self.compute_status(el)).collect();
     }
@@ -88,6 +155,16 @@ impl Session {
         if self.ws.redo() {
             self.refresh();
         }
+    }
+
+    /// Other names people know a target by, most familiar first:
+    /// "glucose", "D-glucose" for "D-glucopyranose".
+    pub fn synonyms(&self, t: Target) -> Vec<String> {
+        let ids = match t {
+            Target::Entity(e) => &self.pack.entity(e).synonyms,
+            Target::Reaction(r) => &self.pack.reaction(r).synonyms,
+        };
+        ids.iter().map(|s| self.pack.str(*s).to_string()).collect()
     }
 
     /// What people call a pack target: "glucose 6-phosphate".
@@ -145,11 +222,14 @@ impl Session {
     fn compute_status(&self, el: Element) -> Status {
         match self.ws.resolution(&self.pack, el) {
             Resolution::Known { targets, .. } => Status::Identified {
-                label: targets
-                    .iter()
-                    .map(|t| self.label(*t))
-                    .collect::<Vec<_>>()
-                    .join(" / "),
+                label: match (self.representative(&targets), targets.len()) {
+                    (Some(t), 1) => self.label(t),
+                    (Some(t), n) if matches!(t, Target::Reaction(_)) => {
+                        format!("{} (and {} compartment variants)", self.label(t), n - 1)
+                    }
+                    (Some(t), n) => format!("{} (and {} more)", self.label(t), n - 1),
+                    (None, _) => String::new(),
+                },
             },
             Resolution::OutsidePack => Status::AnnotatedElsewhere,
             Resolution::Unannotated => {
@@ -205,12 +285,128 @@ impl Session {
         c
     }
 
-    /// Accepts a candidate. Returns a message for the user.
+    /// One target to stand for several equally good ones: the plainest
+    /// (shortest) BiGG id, as the engine prefers ("PGK" over "PGKf").
+    fn representative(&self, targets: &[Target]) -> Option<Target> {
+        let bigg = |t: &Target| -> (usize, String) {
+            let id = match *t {
+                Target::Entity(e) => self.pack.entity_xrefs(e, "bigg.metabolite").next().map(|x| self.pack.str(x.id)),
+                Target::Reaction(r) => self
+                    .pack
+                    .reaction(r)
+                    .xrefs
+                    .iter()
+                    .find(|x| self.pack.namespace_prefix(x.ns) == "bigg.reaction")
+                    .map(|x| self.pack.str(x.id)),
+            };
+            let id = id.unwrap_or_default().to_string();
+            (if id.is_empty() { usize::MAX } else { id.len() }, id)
+        };
+        targets.iter().copied().min_by_key(bigg)
+    }
+
+    fn rejected_entities(&self, el: Element) -> Vec<kpack::EntityId> {
+        self.rejected
+            .get(&el)
+            .into_iter()
+            .flatten()
+            .filter_map(|t| match t {
+                Target::Entity(e) => Some(*e),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Rejects a suggestion: it is not suggested again for this element,
+    /// and the engine does not reason from it. Returns a message.
+    pub fn reject(&mut self, el: Element, target: Target) -> String {
+        let list = self.rejected.entry(el).or_default();
+        if !list.contains(&target) {
+            list.push(target);
+        }
+        self.refresh();
+        format!(
+            "{} will not be suggested again for {}. Restore it under Details.",
+            self.label(target),
+            self.display_name(el)
+        )
+    }
+
+    /// Takes back a rejection.
+    pub fn restore(&mut self, el: Element, target: Target) -> String {
+        if let Some(list) = self.rejected.get_mut(&el) {
+            list.retain(|t| *t != target);
+        }
+        self.refresh();
+        format!("{} can be suggested for {} again.", self.label(target), self.display_name(el))
+    }
+
+    /// The suggestions rejected for an element, with their labels.
+    pub fn rejected(&self, el: Element) -> Vec<(Target, String)> {
+        self.rejected
+            .get(&el)
+            .into_iter()
+            .flatten()
+            .map(|t| (*t, self.label(*t)))
+            .collect()
+    }
+
+    /// Everything the card on a molecule chip shows.
+    pub fn molecule_info(&self, el: Element) -> MoleculeInfo {
+        let name = self.display_name(el);
+        let id = self.ws.element_id(el).to_string();
+        let compartment = match el {
+            Element::Species(i) => self.model.species[i].compartment.clone(),
+            _ => None,
+        };
+        let identified = self.identified_as(el);
+        let target = self
+            .representative(&identified)
+            .or_else(|| self.candidates(el).first().map(|c| c.target));
+        let link = if identified.is_empty() {
+            target.and_then(|t| self.main_link(t))
+        } else {
+            self.ws.identity_uris(el).into_iter().next()
+        };
+        MoleculeInfo {
+            id: (id != name).then_some(id),
+            name,
+            compartment,
+            status: self.status(el),
+            target,
+            synonyms: target.map(|t| self.synonyms(t)).unwrap_or_default(),
+            link,
+        }
+    }
+
+    /// What an element is currently identified as in the pack (empty if it
+    /// is not).
+    pub fn identified_as(&self, el: Element) -> Vec<Target> {
+        match self.ws.resolution(&self.pack, el) {
+            Resolution::Known { targets, .. } => targets,
+            _ => Vec::new(),
+        }
+    }
+
+    /// Accepts a candidate. If the element is already identified as
+    /// something else, the candidate replaces it (one undoable step) rather
+    /// than being added beside it. Returns a message for the user.
     pub fn accept(&mut self, el: Element, target: Target) -> String {
         let label = self.label(target);
-        let msg = match self.ws.accept(&self.pack, el, target) {
-            Ok(_) => format!("{} identified as {label}.", self.display_name(el)),
-            Err(e) => format!("Could not annotate {}: {e}.", self.display_name(el)),
+        let name = self.display_name(el);
+        let current = self.identified_as(el);
+        let msg = if current.contains(&target) {
+            format!("{name} is already identified as {label}.")
+        } else if current.is_empty() {
+            match self.ws.accept(&self.pack, el, target) {
+                Ok(_) => format!("{name} identified as {label}."),
+                Err(e) => format!("Could not annotate {name}: {e}."),
+            }
+        } else {
+            match self.ws.replace_identity(&self.pack, el, target) {
+                Ok(_) => format!("{name} is now identified as {label} instead."),
+                Err(e) => format!("Could not change {name}: {e}."),
+            }
         };
         self.refresh();
         msg

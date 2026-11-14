@@ -14,6 +14,10 @@ pub struct Evidence {
     pub weight: f32,
     /// For people: `name "G6P" is used for it in 17 curated models`.
     pub note: String,
+    /// The evidence leaves no room for doubt: a reaction whose every
+    /// molecule is identified and matches one database reaction exactly.
+    /// Confidence levels may rest on it ([`crate::confidence`]).
+    pub complete: bool,
 }
 
 /// A possible meaning of a species or reaction.
@@ -77,6 +81,7 @@ mod tests {
             provider: "test",
             weight,
             note: String::new(),
+            complete: false,
         }
     }
 

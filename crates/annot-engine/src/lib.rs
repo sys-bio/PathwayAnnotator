@@ -47,11 +47,28 @@ pub fn providers() -> Vec<Box<dyn Provider>> {
 }
 
 /// Suggestions for every species and reaction in `model`, best first.
+///
+/// What the user rejected is removed after every provider, so no later
+/// provider reasons from it (context never anchors on a rejected guess).
 pub fn annotate(pack: &Pack, model: &Model) -> Suggestions {
     let mut out = Suggestions::for_model(model);
     for p in providers() {
         p.run(pack, model, &mut out);
+        drop_rejected(model, &mut out);
     }
     out.rank();
     out
+}
+
+fn drop_rejected(model: &Model, out: &mut Suggestions) {
+    for (s, list) in model.species.iter().zip(out.species.iter_mut()) {
+        if !s.rejected.is_empty() {
+            list.retain(|c| !matches!(c.target, kpack::Target::Entity(e) if s.rejected.contains(&e)));
+        }
+    }
+    for (r, list) in model.reactions.iter().zip(out.reactions.iter_mut()) {
+        if !r.rejected.is_empty() {
+            list.retain(|c| !matches!(c.target, kpack::Target::Reaction(x) if r.rejected.contains(&x)));
+        }
+    }
 }

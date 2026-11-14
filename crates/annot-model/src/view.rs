@@ -25,6 +25,8 @@ impl Workspace {
                 id: s.id.clone(),
                 name: s.name.clone(),
                 compartment: Some(s.compartment.clone()),
+                known: None,
+                rejected: Vec::new(),
             });
         }
         for r in &m.reactions {
@@ -53,6 +55,8 @@ impl Workspace {
                 id: r.id.clone(),
                 name: r.name.clone(),
                 participants,
+                known: None,
+                rejected: Vec::new(),
             });
         }
         out
