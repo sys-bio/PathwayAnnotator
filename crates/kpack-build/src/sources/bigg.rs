@@ -446,13 +446,36 @@ fn without_trailing_bracket(name: &str) -> Option<&str> {
 
 // --- from the cache ----------------------------------------------------------
 
-/// The license notice BiGG's legacy content requires in all copies.
-///
-/// TODO before publishing a pack: replace with the verbatim copyright notice
-/// and license paragraphs from https://bigg.ucsd.edu/license.
-pub const LEGACY_NOTICE: &str = "Contains data from BiGG Models. Copyright (c) 2019 The Regents of \
-     the University of California. Licensed for educational, research and non-profit purposes; \
-     see https://bigg.ucsd.edu/license for the full terms.";
+/// The license notice BiGG's legacy content requires in all copies: the
+/// copyright notice and the four paragraphs of https://bigg.ucsd.edu/license,
+/// verbatim (as published there on 2026-11-14; `\u{a9}` is the copyright
+/// sign). Paragraphs are separated by blank lines. The pack carries it in its
+/// header and the app shows it.
+pub const LEGACY_NOTICE: &str = "Copyright \u{a9} 2019 The Regents of the University of California\n\
+\n\
+All Rights Reserved\n\
+\n\
+Permission to use, copy, modify and distribute any part of BiGG Models for educational, research \
+and non-profit purposes, without fee, and without a written agreement is hereby granted, provided \
+that the above copyright notice, this paragraph and the following three paragraphs appear in all \
+copies.\n\
+\n\
+Those desiring to incorporate BiGG Models into commercial products or use for commercial purposes \
+should contact the Technology Transfer & Intellectual Property Services, University of California, \
+San Diego, 9500 Gilman Drive, Mail Code 0910, La Jolla, CA 92093-0910, Ph: (858) 534-5815, FAX: \
+(858) 534-7345, e-mail: invent@ucsd.edu.\n\
+\n\
+In no event shall the University of California be liable to any party for direct, indirect, \
+special, incidental, or consequential damages, including lost profits, arising out of the use of \
+this bigg database, even if the University of California has been advised of the possibility of \
+such damage.\n\
+\n\
+The BiGG Models provided herein is on an \"as is\" basis, and the University of California has no \
+obligation to provide maintenance, support, updates, enhancements, or modifications. The \
+University of California makes no representations and extends no warranties of any kind, either \
+implied or express, including, but not limited to, the implied warranties of merchantability or \
+fitness for a particular purpose, or that the use of the BiGG Models will not infringe any patent, \
+trademark or other rights.";
 
 /// Parses the cached BiGG files in `dir` and adds them to the pack.
 /// `version` is recorded in the pack header (the download date).

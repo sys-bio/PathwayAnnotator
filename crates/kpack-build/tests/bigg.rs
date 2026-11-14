@@ -162,5 +162,17 @@ fn the_header_carries_the_source_and_its_notice() {
     assert_eq!(p.header.built, "2026-11-13");
     let s = &p.header.sources[0];
     assert_eq!(s.name, "BiGG");
-    assert!(s.notice.as_deref().unwrap().contains("Regents of the University of California"));
+    // The license asks for the copyright notice and all four paragraphs.
+    let notice = s.notice.as_deref().unwrap();
+    assert!(notice.starts_with("Copyright \u{a9} 2019 The Regents of the University of California"));
+    for part in [
+        "All Rights Reserved",
+        "appear in all copies.",
+        "e-mail: invent@ucsd.edu.",
+        "has been advised of the possibility of such damage.",
+        "will not infringe any patent, trademark or other rights.",
+    ] {
+        assert!(notice.contains(part), "{part}");
+    }
+    assert_eq!(notice.split("\n\n").count(), 6, "copyright, rights, and four paragraphs");
 }

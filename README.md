@@ -18,8 +18,10 @@ to send leaves it: pressing Search under "Search other databases" sends
 that text (a name, or ChEBI ids and EC numbers) to EBI, UniProt or Rhea.
 
 Status: the knowledge pack, the suggestion engine, the accuracy
-benchmark and a first version of the web app work; the app is not
-published yet. See [DESIGN.md](DESIGN.md) for the design, data sources and
+benchmark and the web app work. The app is published from `main` at
+https://sys-bio.github.io/PathwayAnnotator/ by the workflow in
+`.github/workflows/pages.yml` (once GitHub Pages is switched on for the
+repository). See [DESIGN.md](DESIGN.md) for the design, data sources and
 results.
 
 ## How it suggests
@@ -74,6 +76,16 @@ trunk serve --open
 `cargo test --workspace` runs the tests; they use small excerpts in
 `crates/kpack-build/tests/fixtures` and need no downloads.
 
+## Publishing
+
+Every push to `main` runs `.github/workflows/pages.yml`: it downloads the
+source data (only when its cache is empty, so each deploy uses the same
+data), builds the knowledge pack and the app for the `/PathwayAnnotator/`
+path, and deploys them to GitHub Pages. To start using newer source data,
+change `SOURCES_CACHE` in the workflow. The first time, set the
+repository's Settings > Pages > Build and deployment > Source to "GitHub
+Actions".
+
 ## Data and licenses
 
 The code is licensed under either of [MIT](LICENSE-MIT) or
@@ -83,7 +95,9 @@ The knowledge pack is built from:
 
 - [BiGG](https://bigg.bio): CC BY 4.0 (BRIGHT data) and the BiGG Models
   license for legacy UC San Diego content (educational, research and
-  non-profit use; https://bigg.ucsd.edu/license).
+  non-profit use; https://bigg.ucsd.edu/license). Its copyright notice and
+  license paragraphs travel with every pack, verbatim, and the app shows
+  them under About.
 - [ChEBI](https://www.ebi.ac.uk/chebi): CC BY 4.0.
 - [BioModels](https://www.biomodels.org): CC0.
 

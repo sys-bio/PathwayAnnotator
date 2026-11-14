@@ -204,6 +204,22 @@ kbd {
   border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22); font-size: 14px;
 }
 .shortcuts-head { display: flex; align-items: baseline; justify-content: space-between; }
+/* About: data sources and their licenses. */
+.about-backdrop { position: fixed; inset: 0; z-index: 45; background: rgba(0, 0, 0, 0.35); }
+.about {
+  position: fixed; z-index: 50; left: 50%; top: 5vh; transform: translateX(-50%);
+  width: min(760px, calc(100vw - 32px)); max-height: 90vh; overflow: auto; padding: 16px 20px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28); font-size: 14px; line-height: 1.5;
+}
+.about h3 { margin: 16px 0 6px; font-size: 16px; }
+.about .shortcuts-head h3 { margin-top: 0; }
+.about h4 { margin: 12px 0 2px; font-size: 14px; }
+.about .source p { margin: 2px 0; }
+.about pre.notice {
+  white-space: pre-wrap; font-family: inherit; font-size: 12px; margin: 6px 0; padding: 8px 10px;
+  background: var(--chip-bg); border-radius: 6px; max-height: 240px; overflow: auto;
+}
 .shortcuts h3 { margin: 0 0 8px; font-size: 15px; }
 .shortcuts table { border-collapse: collapse; width: 100%; }
 .shortcuts td { padding: 3px 6px 3px 0; vertical-align: top; }

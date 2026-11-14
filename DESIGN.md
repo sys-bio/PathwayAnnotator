@@ -415,8 +415,10 @@ BiGG source notes:
 - BiGG has no synonyms of its own; ChEBI supplies them (below).
 - Compartment codes and names come from bigg.bio/api/v3/compartments. Note
   `w` there means "wildtype staph aureus", not cell wall.
-- `LEGACY_NOTICE` in `sources/bigg.rs` must be replaced with the verbatim
-  UCSD license text before a pack is published.
+- `LEGACY_NOTICE` in `sources/bigg.rs` is the copyright notice and the
+  four license paragraphs of bigg.ucsd.edu/license, verbatim (checked word
+  for word against the page, 2026-11-14), which the license requires "in
+  all copies". It is in every pack's header and on the app's About panel.
 
 ChEBI source notes (`sources/chebi.rs`, release 257, CC BY 4.0):
 - Files: the TSV flat files at ftp.ebi.ac.uk/pub/databases/chebi/flat_files
@@ -705,9 +707,19 @@ Known issues / next (in order):
   switch tabs; Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z undo and redo; Esc closes
   the panel, a pinned card or Details. Keys typed into a text box or menu
   are left alone, and so is Enter on a button or link.
-- Publishing to GitHub Pages needs a CI job that builds the pack (BiGG,
-  ChEBI and BioModels fetch, ~10 minutes) or a pack published as a release
-  asset.
+- Started (2026-11-14): publishing. `.github/workflows/pages.yml` runs on
+  every push to main: Rust stable with the wasm32 target, Trunk (pinned
+  release binary), the source data from an Actions cache (downloaded only
+  on a cache miss, so deploys are reproducible; the key `SOURCES_CACHE`
+  names the data snapshot), `kpack-build build`, `trunk build --release
+  --public-url /PathwayAnnotator/`, then upload-pages-artifact and
+  deploy-pages. Checked locally: the site built for that sub-path, served
+  under it, loads the pack and the example, and About shows every source,
+  its license and the BiGG notice. Needs Settings > Pages > Source:
+  GitHub Actions before the first run. (On Windows Git Bash, run the
+  local build with MSYS_NO_PATHCONV=1, or the public URL is rewritten as
+  a Windows path.) A test-and-clippy workflow for pull requests would be
+  a natural next step.
 
 ## 5.4 Searching other databases (`annot-online`, 2026-11-14)
 

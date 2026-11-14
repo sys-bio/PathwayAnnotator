@@ -63,6 +63,11 @@ struct Ctx {
     cursor: RwSignal<Option<Element>>,
     /// Whether the keyboard shortcuts panel is showing.
     help: RwSignal<bool>,
+    /// Whether the About panel (data sources and licenses) is showing.
+    about: RwSignal<bool>,
+    /// The knowledge pack's header: when it was built, and its sources
+    /// with their licenses and the notices they require.
+    pack_header: RwSignal<Option<kpack::Header>>,
 }
 
 /// Opens an element in its tab and scrolls it into view.
@@ -141,6 +146,8 @@ pub fn App() -> impl IntoView {
         organism: RwSignal::new(None),
         cursor: RwSignal::new(None),
         help: RwSignal::new(false),
+        about: RwSignal::new(false),
+        pack_header: RwSignal::new(None),
     };
     provide_context(ctx);
     // Lives as long as the page: the app never unmounts.
@@ -148,7 +155,10 @@ pub fn App() -> impl IntoView {
 
     spawn_local(async move {
         match browser::fetch_pack("kpack.bin").await {
-            Ok(p) => pack.set(Some(Rc::new(p))),
+            Ok(p) => {
+                ctx.pack_header.set(Some(p.header.clone()));
+                pack.set(Some(Rc::new(p)));
+            }
             Err(e) => pack_error.set(Some(e)),
         }
     });
@@ -201,6 +211,7 @@ pub fn App() -> impl IntoView {
             }}
             <Message/>
             <Shortcuts/>
+            <About/>
         </main>
     }
 }
@@ -232,6 +243,14 @@ fn Header() -> impl IntoView {
                 on:click=move |_| ctx.help.update(|h| *h = !*h)
             >
                 "Shortcuts " <kbd>"?"</kbd>
+            </button>
+            <button
+                class="link"
+                title="What this is, where its data comes from, and the data licenses"
+                aria-expanded=move || ctx.about.get().to_string()
+                on:click=move |_| ctx.about.update(|a| *a = !*a)
+            >
+                "About"
             </button>
             <Show when=move || file().is_some()>
                 <div class="actions">
@@ -1733,7 +1752,9 @@ fn on_key(ctx: Ctx, ev: web_sys::KeyboardEvent) {
     match key.as_str() {
         "?" => ctx.help.update(|h| *h = !*h),
         "Escape" => {
-            if ctx.help.get_untracked() {
+            if ctx.about.get_untracked() {
+                ctx.about.set(false);
+            } else if ctx.help.get_untracked() {
                 ctx.help.set(false);
             } else if ctx.pinned.get_untracked().is_some() {
                 ctx.pinned.set(None);
@@ -1861,6 +1882,68 @@ fn act_on_cursor(ctx: Ctx, accept: bool) {
     }
 }
 
+/// What the app is, where its data comes from, and the licenses: every
+/// source in the knowledge pack's header with the notice its license
+/// requires (BiGG's legacy license asks for its full notice in all
+/// copies), and the services searched on request.
+#[component]
+fn About() -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    let sources = move || {
+        ctx.pack_header.with(|h| {
+            h.as_ref()
+                .map(|h| {
+                    h.sources
+                        .iter()
+                        .map(|src| {
+                            let notice = src.notice.clone();
+                            view! {
+                                <section class="source">
+                                    <h4>
+                                        <a href=src.url.clone() target="_blank" rel="noopener noreferrer">{src.name.clone()}</a>
+                                        <span class="muted">{format!(" (version {})", src.version)}</span>
+                                    </h4>
+                                    <p>"License: " {src.license.clone()}</p>
+                                    {notice.map(|n| view! { <pre class="notice">{n}</pre> })}
+                                </section>
+                            }
+                        })
+                        .collect_view()
+                })
+        })
+    };
+    let built = move || ctx.pack_header.with(|h| h.as_ref().map(|h| h.built.clone()));
+    view! {
+        <Show when=move || ctx.about.get()>
+            <div class="about-backdrop" on:click=move |_| ctx.about.set(false)></div>
+            <div class="about" role="dialog" aria-label="About PathwayAnnotator">
+                <div class="shortcuts-head">
+                    <h3>"About PathwayAnnotator"</h3>
+                    <button class="link" on:click=move |_| ctx.about.set(false)>"Close"</button>
+                </div>
+                <p>
+                    "Suggests what each molecule, reaction and compartment of an SBML or Antimony model is, "
+                    "with the evidence, for you to confirm. It runs in your browser: your model is not uploaded. "
+                    "Version " {env!("CARGO_PKG_VERSION")} ". "
+                    <a href="https://github.com/sys-bio/PathwayAnnotator" target="_blank" rel="noopener noreferrer">
+                        "Source code"
+                    </a>
+                    " (MIT or Apache-2.0)."
+                </p>
+                <h3>"Data in the knowledge base"</h3>
+                <p class="muted">{move || built().map(|b| format!("Built {b} from:"))}</p>
+                {sources}
+                <h3>"Searched only when you ask"</h3>
+                <p>
+                    "Search other databases (in Details) sends the search text, or ChEBI ids and EC numbers, to: "
+                    "EBI's Ontology Lookup Service for ChEBI and the Gene Ontology, UniProt, and Rhea "
+                    "(all CC BY 4.0). Nothing is sent otherwise."
+                </p>
+            </div>
+        </Show>
+    }
+}
+
 /// The keyboard shortcuts, shown with ? or the Shortcuts button.
 #[component]
 fn Shortcuts() -> impl IntoView {
@@ -1876,7 +1959,7 @@ fn Shortcuts() -> impl IntoView {
         (&["1", "2", "3"], "Molecules, Reactions, Compartments"),
         (&["Ctrl+Z"], "undo"),
         (&["Ctrl+Y", "Ctrl+Shift+Z"], "redo"),
-        (&["Esc"], "close this, a pinned card, or the details"),
+        (&["Esc"], "close About, this, a pinned card, or the details"),
         (&["?"], "show or hide this list"),
     ];
     view! {

@@ -1,0 +1,86 @@
+# Builds the knowledge pack and the app, and publishes them on GitHub Pages
+# (https://sys-bio.github.io/PathwayAnnotator/).
+#
+# The source data (BiGG, ChEBI, BioModels; about 220 MB) is downloaded only
+# when the cache below is empty, so every deploy builds the pack from the
+# same data. To refresh the data, change SOURCES_CACHE (for example to
+# sources-2026-12) and run the workflow.
+#
+# Before the first run: Settings > Pages > Build and deployment > Source:
+# GitHub Actions.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push waits rather than cancelling.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  SOURCES_CACHE: sources-2026-11
+  TRUNK_VERSION: v0.21.14
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain (with the WebAssembly target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Trunk
+        run: |
+          curl -sSfL "https://github.com/trunk-rs/trunk/releases/download/${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C /usr/local/bin trunk
+          trunk --version
+
+      - name: Cache the source data
+        id: sources
+        uses: actions/cache@v4
+        with:
+          path: data/cache
+          key: ${{ env.SOURCES_CACHE }}
+
+      - name: Download the source data
+        if: steps.sources.outputs.cache-hit != 'true'
+        run: cargo run --release -p kpack-build -- fetch --source all
+
+      - name: Build the knowledge pack
+        run: cargo run --release -p kpack-build -- build
+
+      - name: Build the app
+        working-directory: crates/annot-app
+        run: trunk build --release --public-url /PathwayAnnotator/
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: crates/annot-app/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
