@@ -13,7 +13,9 @@ EC, ...) with the evidence for each suggestion, for you to confirm.
 
 The suggestions come from curated data shipped with the app as a
 **knowledge pack**, not from an online AI service: no accounts, no API
-keys, and models never leave your machine.
+keys, and models never leave your machine. Only search text you choose
+to send leaves it: pressing Search under "Search other databases" sends
+that text (a name, or ChEBI ids and EC numbers) to EBI, UniProt or Rhea.
 
 Status: the knowledge pack, the suggestion engine, the accuracy
 benchmark and a first version of the web app work; the app is not
