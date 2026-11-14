@@ -243,6 +243,18 @@ kbd {
 .sbo-number { width: 9em; }
 .add-term input { min-width: 16em; flex: 1 1 16em; }
 .terms.edit { list-style: none; padding-left: 0; }
+.filters.hidden { visibility: hidden; }
+.model-panel { padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.model-panel h3 { margin: 0 0 2px; font-size: 17px; }
+.model-panel > .muted { margin: 0 0 8px; font-size: 13px; }
+.references .paper { flex-basis: 100%; }
+.model-panel .hint { margin: 4px 0 8px; color: var(--muted); font-size: 13px; }
+.model-panel input, .model-panel select {
+  font: inherit; font-size: 13px; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
+}
+.model-panel input:focus, .model-panel select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.model-panel h4 { margin: 14px 0 4px; }
 .terms.edit li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; padding: 3px 0; word-break: break-all; }
 .annotation .hint { margin: 4px 0 8px; color: var(--muted); font-size: 13px; }
 .qualifier { font-family: ui-monospace, monospace; color: var(--muted); }

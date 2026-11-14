@@ -352,3 +352,34 @@ fn the_model_says_which_organism() {
     }
     assert_eq!(load(MODEL).unwrap().model_taxon(), None);
 }
+
+#[test]
+fn annotating_the_model_itself() {
+    let mut w = load(MODEL).unwrap();
+    let before = w.to_sbml();
+    let paper = "https://identifiers.org/pubmed:26476456";
+    w.add_terms_as(Element::Model, true, "isDescribedBy", &[paper.to_string()]).unwrap();
+    w.set_sbo(Element::Model, Some(293)).unwrap();
+    w.set_model_taxon(Some(9606)).unwrap();
+    w.set_model_taxon(Some(4932)).unwrap();
+    let text = w.to_sbml();
+    assert!(text.contains("bqmodel:isDescribedBy"), "{text}");
+    assert!(text.contains("SBO:0000293"));
+    // Saved and read back: what was written is what is read.
+    let again = load(&text).unwrap();
+    let terms = again.terms(Element::Model);
+    assert!(terms.iter().any(|t| t.model && t.qualifier == "isDescribedBy" && t.uri == paper));
+    assert_eq!(again.model_taxon(), Some(4932), "the organism was replaced, not added");
+    assert_eq!(again.sbo(Element::Model), Some(293));
+    // Model-only and biology-only qualifiers are checked (isDescribedBy is both).
+    assert!(w.add_terms_as(Element::Model, false, "isDerivedFrom", &[paper.to_string()]).is_err());
+    assert!(w.add_terms_as(Element::Model, true, "hasTaxon", &[paper.to_string()]).is_err());
+    w.change_qualifier_as(Element::Model, paper, (true, "isDescribedBy"), (true, "isDerivedFrom")).unwrap();
+    assert!(w.terms(Element::Model).iter().any(|t| t.model && t.qualifier == "isDerivedFrom"));
+    w.remove_term_as(Element::Model, true, "isDerivedFrom", paper).unwrap();
+    assert!(!w.terms(Element::Model).iter().any(|t| t.uri == paper));
+    for _ in 0..6 {
+        assert!(w.undo());
+    }
+    assert_eq!(w.to_sbml(), before);
+}

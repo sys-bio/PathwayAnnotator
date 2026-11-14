@@ -683,6 +683,26 @@ Known issues / next (in order):
   The extra space below the list is gone.
 - Started (2026-11-14): searching other databases; see "Searching other
   databases" below.
+- Done (2026-11-14): a Model tab (key 4) for the model itself. Its
+  framework is its SBO term (non-spatial continuous (293), continuous
+  (62), spatial continuous (292), discrete (63), flux balance (624),
+  logical (234), modelling framework (4); names checked against SBO). Its
+  terms are edited as any element's, with the model qualifiers offered
+  too (`bqmodel:isDescribedBy`, `isDerivedFrom`, `is`, `isInstanceOf`,
+  `hasInstance`; `Workspace::add_terms_as` / `remove_term_as` /
+  `change_qualifier_as` take a model flag, and `annot_model::MODEL_QUALIFIERS`
+  is checked). Papers: a PubMed id, DOI or PMC id in any usual form
+  (`annot_model::reference_uri`: "PMID: 123", "doi:10...", a doi.org URL)
+  becomes `bqmodel:isDescribedBy` with an identifiers.org URI; "Show
+  titles" asks Europe PMC (CORS-open, no key; `annot_online::paper_url`,
+  `parse_paper`) and shows title and citation for the session. Organism:
+  `bqbiol:hasTaxon` from the same list as the protein search, replacing
+  any earlier one (`Workspace::set_model_taxon`, one undo step), and it
+  sets the protein search's organism. What the model describes: a search
+  of GO's biological processes (`annot_online::go_process_url`, under
+  GO:0008150), accepted as `bqbiol:isVersionOf`. Checked in Chrome on the
+  glycolysis example, including undo and redo of each change. Not yet:
+  creators and dates (the vCard history block).
 - Done (2026-11-14): editing the annotation in Details ("Annotation"). The
   SBO term from a menu of terms that suit the element (molecules: simple
   chemical, ion, protein, complex, RNA, DNA, gene, ...; reactions:

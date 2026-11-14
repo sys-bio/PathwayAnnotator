@@ -51,6 +51,16 @@ pub fn go_url(text: &str) -> String {
     )
 }
 
+/// The OLS search for `text` among GO's biological processes (the terms
+/// under GO:0008150): what a model as a whole is about ("glycolytic
+/// process"). Read the answer with [`parse_go`].
+pub fn go_process_url(text: &str) -> String {
+    format!(
+        "https://www.ebi.ac.uk/ols4/api/search?q={}&ontology=go&rows={ROWS}         &fieldList=obo_id,label,exact_synonyms,related_synonyms,description&queryFields=label,synonym         &allChildrenOf=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FGO_0008150",
+        percent_encode(text.trim())
+    )
+}
+
 /// The ChEBI entries in an OLS answer, in OLS's order of relevance, with
 /// exact name matches marked. Entries without a ChEBI id are skipped.
 pub fn parse_chebi(json: &str, query: &str) -> Result<Vec<Hit>, String> {

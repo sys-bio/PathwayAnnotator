@@ -122,3 +122,12 @@ fn go_cellular_components() {
     assert_eq!(hits[0].uri, "https://identifiers.org/GO:0005739");
     assert_eq!(Db::Go.sbo(), 290);
 }
+
+#[test]
+fn a_paper_from_europe_pmc() {
+    let p = annot_online::parse_paper(include_str!("fixtures/europepmc-26476456.json")).unwrap().unwrap();
+    assert!(p.title.starts_with("BiGG Models: A platform"), "{}", p.title);
+    assert!(p.authors.starts_with("King ZA"));
+    assert_eq!(p.year.as_deref(), Some("2016"));
+    assert!(p.citation().ends_with("(2016) Nucleic Acids Res."), "{}", p.citation());
+}

@@ -46,6 +46,10 @@ impl fmt::Display for EditError {
 
 impl std::error::Error for EditError {}
 
+/// The model qualifiers (`bqmodel:`) of the MIRIAM specification: what a
+/// model is, the papers describing it, what it was derived from.
+pub const MODEL_QUALIFIERS: &[&str] = &["is", "isDescribedBy", "isDerivedFrom", "isInstanceOf", "hasInstance"];
+
 /// The biology qualifiers (`bqbiol:`) of the MIRIAM specification.
 pub const BIOLOGY_QUALIFIERS: &[&str] = &[
     "is", "hasPart", "isPartOf", "isVersionOf", "hasVersion", "isHomologTo", "isDescribedBy",
@@ -118,7 +122,13 @@ impl Workspace {
     /// Adds biology-qualifier terms (`bqbiol:<qualifier>`). Resources already
     /// there are not added twice.
     pub fn add_terms(&mut self, el: Element, qualifier: &str, uris: &[String]) -> Result<(), EditError> {
-        let meta = self.with_terms(el, |terms| add(terms, qualifier, uris))?;
+        self.add_terms_as(el, false, qualifier, uris)
+    }
+
+    /// Adds terms with a model qualifier (`bqmodel:`, `model` true) or a
+    /// biology one. Resources already there are not added twice.
+    pub fn add_terms_as(&mut self, el: Element, model: bool, qualifier: &str, uris: &[String]) -> Result<(), EditError> {
+        let meta = self.with_terms(el, |terms| add(terms, model, qualifier, uris))?;
         self.apply(el, meta);
         Ok(())
     }
@@ -126,9 +136,14 @@ impl Workspace {
     /// Removes one biology-qualifier term. Removing a term that is not there
     /// changes nothing.
     pub fn remove_term(&mut self, el: Element, qualifier: &str, uri: &str) -> Result<(), EditError> {
-        check_qualifier(qualifier)?;
+        self.remove_term_as(el, false, qualifier, uri)
+    }
+
+    /// Removes one term with a model (`model` true) or biology qualifier.
+    pub fn remove_term_as(&mut self, el: Element, model: bool, qualifier: &str, uri: &str) -> Result<(), EditError> {
+        check_qualifier(model, qualifier)?;
         let meta = self.with_terms(el, |terms| {
-            for t in terms.iter_mut().filter(|t| !t.model && t.qualifier == qualifier) {
+            for t in terms.iter_mut().filter(|t| t.model == model && t.qualifier == qualifier) {
                 t.resources.retain(|r| r != uri);
             }
             Ok(())
@@ -150,24 +165,54 @@ impl Workspace {
     /// "isVersionOf"), keeping its place in the annotation otherwise. One
     /// undoable edit; nothing changes if the resource is not under `from`.
     pub fn change_qualifier(&mut self, el: Element, uri: &str, from: &str, to: &str) -> Result<(), EditError> {
-        check_qualifier(from)?;
-        check_qualifier(to)?;
+        self.change_qualifier_as(el, uri, (false, from), (false, to))
+    }
+
+    /// As [`Workspace::change_qualifier`], between any qualifiers: each is
+    /// (model qualifier?, name), so a resource can move from
+    /// `bqbiol:isVersionOf` to `bqmodel:isDescribedBy`.
+    pub fn change_qualifier_as(
+        &mut self,
+        el: Element,
+        uri: &str,
+        from: (bool, &str),
+        to: (bool, &str),
+    ) -> Result<(), EditError> {
+        check_qualifier(from.0, from.1)?;
+        check_qualifier(to.0, to.1)?;
         if from == to {
             return Ok(());
         }
         let meta = self.with_terms(el, |terms| {
             let mut moved = false;
-            for t in terms.iter_mut().filter(|t| !t.model && t.qualifier == from) {
+            for t in terms.iter_mut().filter(|t| t.model == from.0 && t.qualifier == from.1) {
                 let before = t.resources.len();
                 t.resources.retain(|r| r != uri);
                 moved |= t.resources.len() != before;
             }
             if moved {
-                add(terms, to, &[uri.to_string()])?;
+                add(terms, to.0, to.1, &[uri.to_string()])?;
             }
             Ok(())
         })?;
         self.apply(el, meta);
+        Ok(())
+    }
+
+    /// Sets what organism the model is about: replaces its `bqbiol:hasTaxon`
+    /// terms with the NCBI taxonomy id `taxon`, or removes them (`None`).
+    /// One undoable edit.
+    pub fn set_model_taxon(&mut self, taxon: Option<u32>) -> Result<(), EditError> {
+        let meta = self.with_terms(Element::Model, |terms| {
+            for t in terms.iter_mut().filter(|t| !t.model && t.qualifier == "hasTaxon") {
+                t.resources.clear();
+            }
+            match taxon {
+                Some(id) => add(terms, false, "hasTaxon", &[format!("https://identifiers.org/taxonomy:{id}")]),
+                None => Ok(()),
+            }
+        })?;
+        self.apply(Element::Model, meta);
         Ok(())
     }
 
@@ -191,7 +236,7 @@ impl Workspace {
     /// edit. Returns the URIs added.
     pub fn accept(&mut self, pack: &Pack, el: Element, target: Target) -> Result<Vec<String>, EditError> {
         let uris = uris_for(pack, target);
-        let mut meta = self.with_terms(el, |terms| add(terms, "is", &uris))?;
+        let mut meta = self.with_terms(el, |terms| add(terms, false, "is", &uris))?;
         let sbo_allowed = !(self.doc.level == 2 && self.doc.version == 1);
         if meta.sbo_term.is_none() && sbo_allowed {
             meta.sbo_term = Some(format!("SBO:{:07}", sbo_for(pack, target)));
@@ -204,7 +249,7 @@ impl Workspace {
     /// URI): adds it as a `bqbiol:is` term and, if the element has no SBO
     /// term and the document can carry one, sets `sbo`. One undoable edit.
     pub fn accept_uri(&mut self, el: Element, uri: &str, sbo: Option<u32>) -> Result<(), EditError> {
-        let mut meta = self.with_terms(el, |terms| add(terms, "is", &[uri.to_string()]))?;
+        let mut meta = self.with_terms(el, |terms| add(terms, false, "is", &[uri.to_string()]))?;
         let sbo_allowed = !(self.doc.level == 2 && self.doc.version == 1);
         if let Some(n) = sbo
             && meta.sbo_term.is_none()
@@ -227,7 +272,7 @@ impl Workspace {
             for t in terms.iter_mut().filter(|t| !t.model && (t.qualifier == "is" || t.qualifier == "isVersionOf")) {
                 t.resources.retain(|r| pack.find_resource(r).is_empty());
             }
-            add(terms, "is", &uris)
+            add(terms, false, "is", &uris)
         })?;
         let sbo_allowed = !(self.doc.level == 2 && self.doc.version == 1);
         if meta.sbo_term.is_none() && sbo_allowed {
@@ -301,22 +346,24 @@ impl Workspace {
     }
 }
 
-fn check_qualifier(q: &str) -> Result<(), EditError> {
-    if BIOLOGY_QUALIFIERS.contains(&q) {
+fn check_qualifier(model: bool, q: &str) -> Result<(), EditError> {
+    let known = if model { MODEL_QUALIFIERS } else { BIOLOGY_QUALIFIERS };
+    if known.contains(&q) {
         Ok(())
     } else {
         Err(EditError::UnknownQualifier(q.to_string()))
     }
 }
 
-/// Adds `uris` to the biology term with `qualifier`, creating it if needed.
-fn add(terms: &mut Vec<CvTerm>, qualifier: &str, uris: &[String]) -> Result<(), EditError> {
-    check_qualifier(qualifier)?;
-    let i = match terms.iter().position(|t| !t.model && t.qualifier == qualifier) {
+/// Adds `uris` to the term with `qualifier` (a model qualifier if `model`),
+/// creating it if needed.
+fn add(terms: &mut Vec<CvTerm>, model: bool, qualifier: &str, uris: &[String]) -> Result<(), EditError> {
+    check_qualifier(model, qualifier)?;
+    let i = match terms.iter().position(|t| t.model == model && t.qualifier == qualifier) {
         Some(i) => i,
         None => {
             terms.push(CvTerm {
-                model: false,
+                model,
                 qualifier: qualifier.to_string(),
                 resources: Vec::new(),
             });

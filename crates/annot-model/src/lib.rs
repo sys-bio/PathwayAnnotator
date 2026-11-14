@@ -28,8 +28,8 @@ mod view;
 pub use edit::{EditError, Term};
 pub use rename::{RenameError, is_valid_id, references_left};
 pub use resolve::{Resolution, resolve};
-pub use edit::BIOLOGY_QUALIFIERS;
-pub use uris::{sbo_for, uri, uri_from_text, uris_for};
+pub use edit::{BIOLOGY_QUALIFIERS, MODEL_QUALIFIERS};
+pub use uris::{reference_uri, sbo_for, uri, uri_from_text, uris_for};
 
 use std::fmt;
 

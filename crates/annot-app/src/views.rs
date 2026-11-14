@@ -9,7 +9,7 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 
 use crate::browser;
-use crate::session::{Counts, QUALIFIER_WORDS, Session, Status, sbo_choices};
+use crate::session::{Counts, Session, Status, qualifier_choices, qualifier_key, sbo_choices};
 
 type SessionSignal = RwSignal<Option<Session>, LocalStorage>;
 
@@ -21,6 +21,7 @@ enum Tab {
     Molecules,
     Reactions,
     Compartments,
+    Model,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -431,14 +432,17 @@ fn Tabs() -> impl IntoView {
             {tab_button(Tab::Molecules, "Molecules")}
             {tab_button(Tab::Reactions, "Reactions")}
             {tab_button(Tab::Compartments, "Compartments")}
-            <span class="filters">
+            {tab_button(Tab::Model, "Model")}
+            <span class="filters" class:hidden=move || ctx.tab.get() == Tab::Model>
                 {filter_button(Filter::All, "All")}
                 {filter_button(Filter::Review, "To review")}
                 {filter_button(Filter::Done, "Identified")}
                 {filter_button(Filter::Nothing, "No suggestion")}
             </span>
         </nav>
-        <ItemList/>
+        <Show when=move || ctx.tab.get() == Tab::Model fallback=|| view! { <ItemList/> }>
+            <ModelPanel/>
+        </Show>
     }
 }
 
@@ -448,6 +452,7 @@ fn rows_of(s: &Session, tab: Tab, filter: Filter) -> Vec<Element> {
         Tab::Molecules => s.species(),
         Tab::Reactions => s.reactions(),
         Tab::Compartments => s.compartments(),
+        Tab::Model => Vec::new(),
     };
     all.into_iter().filter(|el| filter.keeps(&s.status(*el))).collect()
 }
@@ -964,8 +969,9 @@ type SessionEdit = Box<dyn FnOnce(&mut Session) -> Result<String, String>>;
 
 /// The element's annotation, editable: its SBO term, and each MIRIAM term
 /// with its qualifier (changeable) and a Remove button, and a row for
-/// adding one. Every change is one undo step. Model qualifiers
-/// (`bqmodel:`) are shown but left alone.
+/// adding one. Every change is one undo step. The model itself is offered
+/// the model qualifiers (`bqmodel:isDescribedBy`, ...) too, and its SBO
+/// term is its modelling framework.
 #[component]
 fn AnnotationEditor(el: Element) -> impl IntoView {
     let ctx = expect_context::<Ctx>();
@@ -973,7 +979,7 @@ fn AnnotationEditor(el: Element) -> impl IntoView {
     let terms = move || s.with(|s| s.as_ref().map(|s| s.ws.terms(el)).unwrap_or_default());
     let sbo = move || s.with(|s| s.as_ref().and_then(|s| s.ws.sbo(el)));
     let error = RwSignal::new(None::<String>);
-    let add_q = RwSignal::new("is".to_string());
+    let add_q = RwSignal::new(qualifier_key(false, "is"));
     let add_text = RwSignal::new(String::new());
     let other_sbo = RwSignal::new(String::new());
     // Runs an edit, showing its message at the bottom or its error here.
@@ -1011,12 +1017,20 @@ fn AnnotationEditor(el: Element) -> impl IntoView {
         }
     };
     let qualifier_menu = move |current: String, on_pick: Box<dyn Fn(String)>| {
+        let mut choices = qualifier_choices(el);
+        // A term already there with a qualifier not offered here (a model
+        // qualifier on a species) keeps its own.
+        if !choices.iter().any(|(k, _)| *k == current) {
+            choices.insert(0, (current.clone(), "(as written)"));
+        }
         view! {
             <select class="qualifier-menu" on:change=move |ev| on_pick(event_target_value(&ev))>
-                {QUALIFIER_WORDS
-                    .iter()
-                    .map(|(q, words)| {
-                        view! { <option value=*q prop:selected=*q == current.as_str()>{*words}</option> }
+                {choices
+                    .into_iter()
+                    .map(|(key, words)| {
+                        let selected = key == current;
+                        let shown = if words == "(as written)" { key.clone() } else { words.to_string() };
+                        view! { <option value=key prop:selected=selected>{shown}</option> }
                     })
                     .collect_view()}
             </select>
@@ -1030,7 +1044,9 @@ fn AnnotationEditor(el: Element) -> impl IntoView {
         view! {
             <div class="sbo-row">
                 <label>
-                    <span class="muted">"Kind (SBO term) "</span>
+                    <span class="muted">
+                        {if el == Element::Model { "Framework (SBO term) " } else { "Kind (SBO term) " }}
+                    </span>
                     <select on:change=move |ev| {
                         let v = event_target_value(&ev);
                         let n = v.parse::<u32>().ok();
@@ -1085,21 +1101,19 @@ fn AnnotationEditor(el: Element) -> impl IntoView {
             .into_iter()
             .map(|t| {
                 let uri = t.uri.clone();
-                let qualifier = if t.model {
-                    view! { <span class="qualifier">{format!("model {}", t.qualifier)}</span> }.into_any()
-                } else {
-                    let (uri, from) = (uri.clone(), t.qualifier.clone());
+                let key = qualifier_key(t.model, &t.qualifier);
+                let qualifier = {
+                    let (uri, from) = (uri.clone(), key.clone());
                     qualifier_menu(
-                        t.qualifier.clone(),
+                        key.clone(),
                         Box::new(move |to: String| {
                             let (uri, from) = (uri.clone(), from.clone());
                             run(Box::new(move |s| s.change_qualifier(el, &uri, &from, &to)));
                         }),
                     )
-                    .into_any()
                 };
-                let remove = (!t.model).then(|| {
-                    let (uri, q) = (uri.clone(), t.qualifier.clone());
+                let remove = {
+                    let (uri, q) = (uri.clone(), key.clone());
                     view! {
                         <button
                             class="link"
@@ -1112,7 +1126,7 @@ fn AnnotationEditor(el: Element) -> impl IntoView {
                             "Remove"
                         </button>
                     }
-                });
+                };
                 view! {
                     <li>
                         {qualifier}
@@ -1154,6 +1168,207 @@ fn AnnotationEditor(el: Element) -> impl IntoView {
     }
 }
 
+/// The model itself: its name and id, its framework and every annotation
+/// term ([`AnnotationEditor`]), the papers describing it (with their
+/// titles from Europe PMC, on request), the organism it is about, and a
+/// search of GO's biological processes for what it describes.
+#[component]
+fn ModelPanel() -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    let s = ctx.session;
+    let el = Element::Model;
+    let name = move || {
+        s.with(|s| {
+            s.as_ref().map(|s| {
+                let d = s.ws.document();
+                let m = d.model.as_ref();
+                (
+                    m.and_then(|m| m.name.clone()).filter(|n| !n.trim().is_empty()),
+                    m.and_then(|m| m.id.clone()).unwrap_or_default(),
+                    format!("SBML Level {} Version {}", d.level, d.version),
+                )
+            })
+        })
+    };
+    let references = move || s.with(|s| s.as_ref().map(|s| s.references()).unwrap_or_default());
+    let taxon = move || s.with(|s| s.as_ref().and_then(|s| s.ws.model_taxon()));
+    let error = RwSignal::new(None::<String>);
+    let ref_text = RwSignal::new(String::new());
+    let looking_up = RwSignal::new(false);
+    let run = move |f: SessionEdit| {
+        let mut out = None;
+        s.update(|s| {
+            if let Some(s) = s {
+                out = Some(f(s));
+            }
+        });
+        match out {
+            Some(Ok(msg)) => {
+                error.set(None);
+                ctx.message.set(Some(msg));
+            }
+            Some(Err(e)) => error.set(Some(e)),
+            None => {}
+        }
+    };
+    let add_reference = move || {
+        let text = ref_text.get_untracked();
+        run(Box::new(move |s| s.add_reference(&text)));
+        if error.get_untracked().is_none() {
+            ref_text.set(String::new());
+        }
+    };
+    // Titles of the references, from Europe PMC: only when asked.
+    let look_up = move || {
+        let wanted: Vec<(String, String)> = s.with_untracked(|s| {
+            s.as_ref()
+                .map(|s| {
+                    s.references()
+                        .into_iter()
+                        .filter(|u| s.paper(u).is_none())
+                        .filter_map(|u| annot_online::paper_url(&u).map(|url| (u, url)))
+                        .collect()
+                })
+                .unwrap_or_default()
+        });
+        if wanted.is_empty() {
+            return;
+        }
+        looking_up.set(true);
+        spawn_local(async move {
+            let mut problems = Vec::new();
+            for (uri, url) in wanted {
+                match browser::fetch_text(&url).await.and_then(|j| annot_online::parse_paper(&j)) {
+                    Ok(Some(p)) => s.update(|s| {
+                        if let Some(s) = s {
+                            s.remember_paper(uri, p);
+                        }
+                    }),
+                    Ok(None) => problems.push(format!("Europe PMC has nothing for {uri}.")),
+                    Err(e) => problems.push(format!("Europe PMC: {e}")),
+                }
+            }
+            looking_up.set(false);
+            error.set((!problems.is_empty()).then(|| problems.join(" ")));
+        });
+    };
+    let reference_rows = move || {
+        references()
+            .into_iter()
+            .map(|uri| {
+                let paper = s.with(|s| s.as_ref().and_then(|s| s.paper(&uri).cloned()));
+                let key = s.with_untracked(|s| {
+                    s.as_ref()
+                        .and_then(|s| {
+                            s.ws.terms(el).into_iter().find(|t| t.uri == uri && t.qualifier == "isDescribedBy")
+                        })
+                        .map(|t| qualifier_key(t.model, &t.qualifier))
+                        .unwrap_or_else(|| qualifier_key(true, "isDescribedBy"))
+                });
+                let remove_uri = uri.clone();
+                view! {
+                    <li>
+                        {match paper {
+                            Some(p) => view! {
+                                <span class="paper">
+                                    <b>{p.title.clone()}</b>
+                                    " "
+                                    <span class="muted">{p.citation()}</span>
+                                </span>
+                            }
+                                .into_any(),
+                            None => ().into_any(),
+                        }}
+                        <a href=uri.clone() target="_blank" rel="noopener noreferrer">{uri.clone()}</a>
+                        <button
+                            class="link"
+                            on:click=move |_| {
+                                let (uri, key) = (remove_uri.clone(), key.clone());
+                                run(Box::new(move |s| s.remove_term(el, &key, &uri)));
+                            }
+                        >
+                            "Remove"
+                        </button>
+                    </li>
+                }
+            })
+            .collect_view()
+    };
+    let organism_menu = move || {
+        let current = taxon();
+        let known = current.is_some_and(|t| annot_online::ORGANISMS.iter().any(|(id, _)| *id == t));
+        view! {
+            <select on:change=move |ev| {
+                let t = event_target_value(&ev).parse::<u32>().ok();
+                run(Box::new(move |s| s.set_organism(t)));
+                ctx.organism.set(t);
+            }>
+                <option value="" prop:selected=current.is_none()>"not stated"</option>
+                {annot_online::ORGANISMS
+                    .iter()
+                    .map(|(id, n)| {
+                        view! { <option value=id.to_string() prop:selected=current == Some(*id)>{*n}</option> }
+                    })
+                    .collect_view()}
+                {current
+                    .filter(|_| !known)
+                    .map(|t| view! { <option value=t.to_string() prop:selected=true>{format!("taxon {t}")}</option> })}
+            </select>
+        }
+    };
+    view! {
+        <section class="model-panel">
+            {move || {
+                name()
+                    .map(|(name, id, level)| {
+                        view! {
+                            <h3>{name.clone().unwrap_or_else(|| id.clone())}</h3>
+                            <p class="muted">
+                                {name.is_some().then(|| format!("id {id}; "))} {level}
+                            </p>
+                        }
+                    })
+            }}
+            <AnnotationEditor el=el/>
+
+            <h4>"Papers describing the model"</h4>
+            <ul class="terms edit references">{reference_rows}</ul>
+            <div class="add-term">
+                <input
+                    type="text"
+                    placeholder="PubMed id, DOI or PMC id"
+                    prop:value=move || ref_text.get()
+                    on:input=move |ev| ref_text.set(event_target_value(&ev))
+                    on:keydown=move |ev: web_sys::KeyboardEvent| {
+                        if ev.key() == "Enter" {
+                            add_reference();
+                        }
+                    }
+                />
+                <button on:click=move |_| add_reference()>"Add paper"</button>
+                <button
+                    disabled=move || references().is_empty() || looking_up.get()
+                    on:click=move |_| look_up()
+                >
+                    {move || if looking_up.get() { "Looking up..." } else { "Show titles" }}
+                </button>
+            </div>
+            <p class="hint">
+                "Saved as bqmodel:isDescribedBy. Show titles asks Europe PMC (www.ebi.ac.uk) about these ids."
+            </p>
+
+            <h4>"Organism"</h4>
+            <div class="add-term">
+                <label><span class="muted">"The model is about "</span> {organism_menu}</label>
+            </div>
+            <p class="hint">"Saved as bqbiol:hasTaxon; protein searches start with it."</p>
+            {move || error.get().map(|e| view! { <p class="error" role="alert">{e}</p> })}
+
+            <OnlineSearch el=el/>
+        </section>
+    }
+}
+
 /// What a search of other databases has come to.
 #[derive(Clone)]
 enum Found {
@@ -1180,6 +1395,7 @@ fn OnlineSearch(el: Element) -> impl IntoView {
     let s = ctx.session;
     let reaction = matches!(el, Element::Reaction(_));
     let compartment = matches!(el, Element::Compartment(_));
+    let whole_model = el == Element::Model;
     let text = RwSignal::new(s.with_untracked(|s| s.as_ref().map(|s| s.search_text(el)).unwrap_or_default()));
     let enzyme = RwSignal::new(s.with_untracked(|s| s.as_ref().map(|s| s.enzyme_text(el)).unwrap_or_default()));
     let found = RwSignal::new(None::<Found>);
@@ -1197,8 +1413,9 @@ fn OnlineSearch(el: Element) -> impl IntoView {
         spawn_local(async move {
             let mut hits = Vec::new();
             let mut problems = Vec::new();
-            if compartment {
-                match browser::fetch_text(&annot_online::go_url(&q)).await.and_then(|j| annot_online::parse_go(&j, &q)) {
+            if compartment || whole_model {
+                let url = if whole_model { annot_online::go_process_url(&q) } else { annot_online::go_url(&q) };
+                match browser::fetch_text(&url).await.and_then(|j| annot_online::parse_go(&j, &q)) {
                     Ok(mut h) => {
                         annot_online::exact_first(&mut h);
                         hits.extend(h);
@@ -1392,6 +1609,30 @@ fn OnlineSearch(el: Element) -> impl IntoView {
                 </p>
             }
                 .into_any()
+        } else if whole_model {
+            view! {
+                <div class="online-form">
+                    <label>
+                        <span class="muted">"Search GO's processes for "</span>
+                        <input
+                            type="text"
+                            prop:value=move || text.get()
+                            on:input=move |ev| text.set(event_target_value(&ev))
+                            on:keydown=move |ev: web_sys::KeyboardEvent| {
+                                if ev.key() == "Enter" {
+                                    search();
+                                }
+                            }
+                        />
+                    </label>
+                    <button class="primary" on:click=move |_| search()>"Search GO"</button>
+                </div>
+                <p class="hint">
+                    "The Gene Ontology's biological processes (\"glycolytic process\"): what the model as a whole "
+                    "describes. Accepting adds it as \"is a version of\". Sends the text to " {Db::Go.host()} "."
+                </p>
+            }
+                .into_any()
         } else if compartment {
             view! {
                 <div class="online-form">
@@ -1461,6 +1702,7 @@ fn OnlineSearch(el: Element) -> impl IntoView {
                         Db::Chebi => "ChEBI: molecules",
                         Db::Uniprot => "UniProt: proteins",
                         Db::Rhea => "Rhea: reactions",
+                        Db::Go if whole_model => "GO: biological processes",
                         Db::Go => "GO: cellular components",
                     };
                     view! { <h5>{what}</h5> }
@@ -1797,11 +2039,12 @@ fn on_key(ctx: Ctx, ev: web_sys::KeyboardEvent) {
                 Duration::from_millis(50),
             );
         }
-        "1" | "2" | "3" => {
+        "1" | "2" | "3" | "4" => {
             ctx.tab.set(match key.as_str() {
                 "1" => Tab::Molecules,
                 "2" => Tab::Reactions,
-                _ => Tab::Compartments,
+                "3" => Tab::Compartments,
+                _ => Tab::Model,
             });
             ctx.cursor.set(None);
         }
@@ -1956,7 +2199,7 @@ fn Shortcuts() -> impl IntoView {
         (&["a"], "accept the row's suggestion, then go to the next row"),
         (&["r"], "reject the row's suggestion, then go to the next row"),
         (&["/"], "search other databases for the row"),
-        (&["1", "2", "3"], "Molecules, Reactions, Compartments"),
+        (&["1", "2", "3", "4"], "Molecules, Reactions, Compartments, Model"),
         (&["Ctrl+Z"], "undo"),
         (&["Ctrl+Y", "Ctrl+Shift+Z"], "redo"),
         (&["Esc"], "close About, this, a pinned card, or the details"),

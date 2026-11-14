@@ -69,9 +69,49 @@ pub const QUALIFIER_WORDS: &[(&str, &str)] = &[
     ("hasTaxon", "is in organism"),
 ];
 
-/// A qualifier in words ("isVersionOf" -> "is a version of (a kind of)").
-pub fn qualifier_words(q: &str) -> &str {
-    QUALIFIER_WORDS.iter().find(|(k, _)| *k == q).map_or(q, |(_, w)| w)
+/// The model qualifiers in words (`bqmodel:`), for the model itself.
+pub const MODEL_QUALIFIER_WORDS: &[(&str, &str)] = &[
+    ("isDescribedBy", "is described by (a paper)"),
+    ("isDerivedFrom", "is derived from (another model)"),
+    ("is", "is (this model entry)"),
+    ("isInstanceOf", "is an instance of"),
+    ("hasInstance", "has instance"),
+];
+
+/// A qualifier as the editor names it: "bqbiol:isVersionOf",
+/// "bqmodel:isDescribedBy".
+pub fn qualifier_key(model: bool, q: &str) -> String {
+    format!("{}:{q}", if model { "bqmodel" } else { "bqbiol" })
+}
+
+/// (model qualifier?, name) from a [`qualifier_key`]; a bare name is a
+/// biology qualifier.
+pub fn split_qualifier(key: &str) -> (bool, &str) {
+    match key.split_once(':') {
+        Some(("bqmodel", q)) => (true, q),
+        Some(("bqbiol", q)) => (false, q),
+        _ => (false, key),
+    }
+}
+
+/// A qualifier in words ("bqbiol:isVersionOf" -> "is a version of (a kind
+/// of)", "bqmodel:isDescribedBy" -> "is described by (a paper)").
+pub fn qualifier_words(key: &str) -> &str {
+    let (model, q) = split_qualifier(key);
+    let table = if model { MODEL_QUALIFIER_WORDS } else { QUALIFIER_WORDS };
+    table.iter().find(|(k, _)| *k == q).map_or(q, |(_, w)| w)
+}
+
+/// The qualifiers to offer for an element, as ([`qualifier_key`], words):
+/// the model qualifiers first for the model itself, then the biology ones.
+pub fn qualifier_choices(el: Element) -> Vec<(String, &'static str)> {
+    let model = matches!(el, Element::Model);
+    let mut out: Vec<(String, &'static str)> = Vec::new();
+    if model {
+        out.extend(MODEL_QUALIFIER_WORDS.iter().map(|(q, w)| (qualifier_key(true, q), *w)));
+    }
+    out.extend(QUALIFIER_WORDS.iter().map(|(q, w)| (qualifier_key(false, q), *w)));
+    out
 }
 
 /// The SBO terms that suit an element, with their names (checked against
@@ -114,7 +154,15 @@ pub fn sbo_choices(el: Element) -> &'static [(u32, &'static str)] {
             (289, "functional compartment"),
             (410, "implicit compartment"),
         ],
-        Element::Model => &[],
+        Element::Model => &[
+            (293, "non-spatial continuous framework (ODEs)"),
+            (62, "continuous framework"),
+            (292, "spatial continuous framework"),
+            (63, "discrete framework"),
+            (624, "flux balance framework"),
+            (234, "logical framework"),
+            (4, "modelling framework"),
+        ],
     }
 }
 
@@ -154,6 +202,8 @@ pub struct Session {
     online_labels: BTreeMap<String, String>,
     /// The same entries' plain names ("keto-D-fructose 6-phosphate").
     online_names: BTreeMap<String, String>,
+    /// Papers looked up for the model's references (Europe PMC), by URI.
+    papers: BTreeMap<String, annot_online::Paper>,
 }
 
 impl Session {
@@ -173,6 +223,7 @@ impl Session {
             rejected: BTreeMap::new(),
             online_labels: BTreeMap::new(),
             online_names: BTreeMap::new(),
+            papers: BTreeMap::new(),
         };
         s.refresh();
         s
@@ -354,7 +405,7 @@ impl Session {
                 let c = &self.model.compartments[i];
                 c.name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| c.id.clone())
             }
-            _ => String::new(),
+            Element::Model => "The model".into(),
         }
     }
 
@@ -770,6 +821,21 @@ impl Session {
     /// a message for the user.
     pub fn accept_online(&mut self, el: Element, hit: &annot_online::Hit) -> String {
         let name = self.display_name(el);
+        // For the model itself, a GO process is what it is a version of; no
+        // SBO term (the model's is its framework).
+        if el == Element::Model {
+            let what = format!("{} ({} {})", hit.label, hit.db.label(), hit.id);
+            let msg = match self.ws.add_terms(el, "isVersionOf", std::slice::from_ref(&hit.uri)) {
+                Ok(()) => {
+                    self.online_labels.insert(hit.uri.clone(), what.clone());
+                    self.online_names.insert(hit.uri.clone(), hit.label.clone());
+                    format!("The model is now a version of {what}.")
+                }
+                Err(e) => format!("Could not annotate the model: {e}."),
+            };
+            self.refresh();
+            return msg;
+        }
         let in_pack = self
             .pack
             .find_resource(&hit.uri)
@@ -804,33 +870,81 @@ impl Session {
         })
     }
 
-    /// Moves an annotation resource to another qualifier.
+    /// Moves an annotation resource to another qualifier (both as
+    /// [`qualifier_key`]s, so model and biology qualifiers alike).
     pub fn change_qualifier(&mut self, el: Element, uri: &str, from: &str, to: &str) -> Result<String, String> {
         let name = self.display_name(el);
-        self.ws.change_qualifier(el, uri, from, to).map_err(|e| format!("Could not change {name}: {e}."))?;
+        self.ws
+            .change_qualifier_as(el, uri, split_qualifier(from), split_qualifier(to))
+            .map_err(|e| format!("Could not change {name}: {e}."))?;
         self.refresh();
         Ok(format!("{name}: {} {uri}.", qualifier_words(to)))
     }
 
-    /// Removes one annotation term.
-    pub fn remove_term(&mut self, el: Element, qualifier: &str, uri: &str) -> Result<String, String> {
+    /// Removes one annotation term (`key` as [`qualifier_key`]).
+    pub fn remove_term(&mut self, el: Element, key: &str, uri: &str) -> Result<String, String> {
         let name = self.display_name(el);
-        self.ws.remove_term(el, qualifier, uri).map_err(|e| format!("Could not change {name}: {e}."))?;
+        let (model, q) = split_qualifier(key);
+        self.ws.remove_term_as(el, model, q, uri).map_err(|e| format!("Could not change {name}: {e}."))?;
         self.refresh();
         Ok(format!("Removed {uri} from {name}."))
     }
 
     /// Adds an annotation term from what the user typed (a compact
-    /// identifier or a URL; [`annot_model::uri_from_text`]).
-    pub fn add_term(&mut self, el: Element, qualifier: &str, text: &str) -> Result<String, String> {
+    /// identifier or a URL; [`annot_model::uri_from_text`]; for a paper,
+    /// also a PubMed id or DOI: [`annot_model::reference_uri`]).
+    pub fn add_term(&mut self, el: Element, key: &str, text: &str) -> Result<String, String> {
         let name = self.display_name(el);
-        let uri = annot_model::uri_from_text(text)?;
-        if self.ws.terms(el).iter().any(|t| !t.model && t.qualifier == qualifier && t.uri == uri) {
+        let (model, q) = split_qualifier(key);
+        let uri = if q == "isDescribedBy" { annot_model::reference_uri(text)? } else { annot_model::uri_from_text(text)? };
+        if self.ws.terms(el).iter().any(|t| t.model == model && t.qualifier == q && t.uri == uri) {
             return Err(format!("{name} already has that."));
         }
-        self.ws.add_terms(el, qualifier, std::slice::from_ref(&uri)).map_err(|e| format!("Could not change {name}: {e}."))?;
+        self.ws
+            .add_terms_as(el, model, q, std::slice::from_ref(&uri))
+            .map_err(|e| format!("Could not change {name}: {e}."))?;
         self.refresh();
-        Ok(format!("{name}: {} {uri}.", qualifier_words(qualifier)))
+        Ok(format!("{name}: {} {uri}.", qualifier_words(key)))
+    }
+
+    /// The papers describing the model: its `isDescribedBy` resources
+    /// (model qualifier, or the biology one some models use).
+    pub fn references(&self) -> Vec<String> {
+        self.ws
+            .terms(Element::Model)
+            .into_iter()
+            .filter(|t| t.qualifier == "isDescribedBy")
+            .map(|t| t.uri)
+            .collect()
+    }
+
+    /// Adds a paper describing the model, from a PubMed id, DOI, PMC id or
+    /// URL ([`annot_model::reference_uri`]).
+    pub fn add_reference(&mut self, text: &str) -> Result<String, String> {
+        self.add_term(Element::Model, &qualifier_key(true, "isDescribedBy"), text)
+    }
+
+    /// Sets (or clears) the organism the model is about.
+    pub fn set_organism(&mut self, taxon: Option<u32>) -> Result<String, String> {
+        self.ws.set_model_taxon(taxon).map_err(|e| format!("Could not change the model: {e}."))?;
+        self.refresh();
+        Ok(match taxon {
+            Some(t) => {
+                let name = annot_online::ORGANISMS.iter().find(|(id, _)| *id == t).map(|(_, n)| n.to_string());
+                format!("The model is now about {} (taxon {t}).", name.unwrap_or_else(|| "this organism".into()))
+            }
+            None => "The model no longer names an organism.".into(),
+        })
+    }
+
+    /// A paper looked up for a reference, if it has been.
+    pub fn paper(&self, uri: &str) -> Option<&annot_online::Paper> {
+        self.papers.get(uri)
+    }
+
+    /// Keeps a paper looked up for a reference, for this session.
+    pub fn remember_paper(&mut self, uri: String, paper: annot_online::Paper) {
+        self.papers.insert(uri, paper);
     }
 
     /// The file name for the annotated model: "model.xml" -> "model-annotated.xml".

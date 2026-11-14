@@ -9,6 +9,9 @@
 //!   [`parse_uniprot`]);
 //! - compartments: the Gene Ontology's cellular components, through OLS
 //!   ([`go_url`], [`parse_go`]);
+//! - a model's biological process: GO's biological processes
+//!   ([`go_process_url`]), and its papers: Europe PMC ([`paper_url`],
+//!   [`parse_paper`]);
 //! - reactions: Rhea, by the ChEBI ids of the reaction's molecules where
 //!   they are known, else by their names ([`rhea_url`], [`parse_rhea`]),
 //!   ranked by how well each Rhea reaction fits ([`rank_rhea`]).
@@ -17,11 +20,13 @@
 //! crate builds the URLs and reads the answers; the caller fetches.
 
 mod chebi;
+mod papers;
 mod rhea;
 mod text;
 mod uniprot;
 
-pub use chebi::{chebi_url, go_url, parse_chebi, parse_go};
+pub use chebi::{chebi_url, go_process_url, go_url, parse_chebi, parse_go};
+pub use papers::{Paper, paper_url, parse_paper};
 pub use rhea::{Participant, RheaQuery, ec_from_text, ecs_of_proteins, merge_ranked, parse_rhea, rank_rhea, rhea_url};
 pub use text::{percent_encode, query_from_id};
 pub use uniprot::{ORGANISMS, parse_uniprot, uniprot_ec_url, uniprot_url};

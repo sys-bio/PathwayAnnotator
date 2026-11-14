@@ -89,6 +89,36 @@ pub fn uri_from_text(text: &str) -> Result<String, String> {
     }
 }
 
+/// The annotation URI for a paper, from how people write references: a
+/// PubMed id ("12345678", "PMID: 12345678", "pubmed:12345678"), a DOI
+/// ("10.1093/nar/gkv1049", "doi:10...", "https://doi.org/10..."), or a
+/// PubMed Central id ("PMC1234567"). Anything else as
+/// [`uri_from_text`] reads it.
+pub fn reference_uri(text: &str) -> Result<String, String> {
+    let t = text.trim();
+    let lower = t.to_ascii_lowercase();
+    let digits = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
+    let pmid = ["pmid:", "pmid", "pubmed:"]
+        .iter()
+        .find_map(|p| lower.strip_prefix(p))
+        .map(str::trim)
+        .unwrap_or(&lower);
+    if digits(pmid) {
+        return Ok(format!("https://identifiers.org/pubmed:{pmid}"));
+    }
+    if let Some(n) = lower.strip_prefix("pmc").filter(|n| digits(n)) {
+        return Ok(format!("https://identifiers.org/pmc:PMC{n}"));
+    }
+    let doi = ["https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "http://dx.doi.org/", "doi:"]
+        .iter()
+        .find_map(|p| lower.strip_prefix(p).map(|_| t[p.len()..].trim()))
+        .unwrap_or(t);
+    if doi.starts_with("10.") && doi.contains('/') && !doi.contains(char::is_whitespace) {
+        return Ok(format!("https://identifiers.org/doi:{doi}"));
+    }
+    uri_from_text(t)
+}
+
 /// The SBO term for accepting `target`: simple chemical (247) for a
 /// molecule, transport reaction (185) or biochemical reaction (176).
 pub fn sbo_for(pack: &Pack, target: Target) -> u32 {
@@ -102,6 +132,23 @@ pub fn sbo_for(pack: &Pack, target: Target) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn references() {
+        for (text, uri) in [
+            ("12345678", "https://identifiers.org/pubmed:12345678"),
+            ("PMID: 12345678", "https://identifiers.org/pubmed:12345678"),
+            ("pubmed:12345678", "https://identifiers.org/pubmed:12345678"),
+            ("PMC1234567", "https://identifiers.org/pmc:PMC1234567"),
+            ("10.1093/nar/gkv1049", "https://identifiers.org/doi:10.1093/nar/gkv1049"),
+            ("doi:10.1093/nar/gkv1049", "https://identifiers.org/doi:10.1093/nar/gkv1049"),
+            ("https://doi.org/10.1093/NAR/gkv1049", "https://identifiers.org/doi:10.1093/NAR/gkv1049"),
+            ("https://example.org/paper", "https://example.org/paper"),
+        ] {
+            assert_eq!(reference_uri(text).unwrap(), uri, "{text}");
+        }
+        assert!(reference_uri("a paper by Smith").is_err());
+    }
 
     #[test]
     fn typed_identifiers() {
