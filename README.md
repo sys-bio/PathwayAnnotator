@@ -1,8 +1,10 @@
 # PathwayAnnotator
 
-# AI Assistance
+## AI Assistance
 
 This software was developed with the assistance of Anthropic's Claude, an AI model, through Claude Code. Stop here if you aren't comfortable with AI assisted code generation.
+
+## Introduction
 
 An SBML annotator for biologists and modelers, written in Rust. It will
 run entirely in the browser (WebAssembly on GitHub Pages): load a model,
