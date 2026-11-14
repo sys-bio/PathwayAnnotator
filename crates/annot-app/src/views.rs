@@ -300,7 +300,7 @@ fn Overview() -> impl IntoView {
                 n = s.accept_all_high();
             }
         });
-        ctx.message.set(Some(format!("Accepted {n} high-confidence suggestions. Undo reverts them one at a time.")));
+        ctx.message.set(Some(format!("Accepted {n} high-confidence suggestions. Undo reverts all of them in one step.")));
     };
     view! {
         <section class="overview">

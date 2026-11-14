@@ -430,20 +430,17 @@ impl Session {
         ))
     }
 
+    /// Accepts every High suggestion, as one undoable step.
     pub fn accept_all_high(&mut self) -> usize {
-        let mut n = 0;
-        for el in self.species().into_iter().chain(self.reactions()) {
-            if let Status::Suggested {
-                level: Confidence::High,
-                ..
-            } = self.status(el)
-            {
-                let target = self.candidates(el)[0].target;
-                if self.ws.accept(&self.pack, el, target).is_ok() {
-                    n += 1;
-                }
-            }
-        }
+        let todo: Vec<(Element, Target)> = self
+            .species()
+            .into_iter()
+            .chain(self.reactions())
+            .filter(|&el| matches!(self.status(el), Status::Suggested { level: Confidence::High, .. }))
+            .map(|el| (el, self.candidates(el)[0].target))
+            .collect();
+        let pack = &self.pack;
+        let n = self.ws.batch(|ws| todo.iter().filter(|&&(el, t)| ws.accept(pack, el, t).is_ok()).count());
         self.refresh();
         n
     }

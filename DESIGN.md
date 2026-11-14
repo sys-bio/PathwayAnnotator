@@ -638,7 +638,8 @@ Renaming SBML ids (2026-11-14), `annot_model::Workspace::rename`:
   renaming in Antimony text (an Antimony model is exported as SBML).
 
 Known issues / next (in order):
-- "Accept all" is undone one element at a time; it should be one step.
+- Done (2026-11-14): "Accept all" is now one undo step (`Workspace::batch`
+  groups edits into one `Change::Group`).
 - Some BiGG labels are poor ("R_glucose_transport__uniport_", "PGKf");
   prefer a ChEBI/Rhea name or a cleaned label for display.
 - A molecule card opened near the bottom of the page needed extra space

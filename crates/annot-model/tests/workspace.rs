@@ -139,6 +139,33 @@ fn undo_and_redo() {
 }
 
 #[test]
+fn a_batch_is_one_undo_step() {
+    let p = pack();
+    let mut w = load(MODEL).unwrap();
+    w.set_sbo(Element::Species(0), Some(247)).unwrap();
+    let before = w.to_sbml();
+    w.batch(|w| {
+        w.accept(&p, Element::Species(1), entity(&p, "f6p")).unwrap();
+        // Changes nothing, so it is not recorded.
+        w.set_sbo(Element::Species(0), Some(247)).unwrap();
+        w.rename(Element::Reaction(0), "PGI").unwrap();
+        w.set_sbo(Element::Reaction(0), Some(176)).unwrap();
+    });
+    let after = w.to_sbml();
+    assert!(after.contains("id=\"PGI\""));
+    // One undo reverts the whole batch, and only the batch.
+    assert!(w.undo());
+    assert_eq!(w.to_sbml(), before);
+    assert!(w.can_undo());
+    assert!(w.redo());
+    assert_eq!(w.to_sbml(), after);
+    // An empty batch adds no step.
+    w.batch(|_| ());
+    w.undo();
+    assert_eq!(w.to_sbml(), before);
+}
+
+#[test]
 fn accepting_twice_adds_but_replacing_swaps() {
     let p = pack();
     let f6p = entity(&p, "f6p");

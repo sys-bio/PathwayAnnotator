@@ -87,6 +87,8 @@ enum Change {
         before: Box<sbml_io::Document>,
         after: Box<sbml_io::Document>,
     },
+    /// Several changes undone and redone together ([`Workspace::batch`]).
+    Group(Vec<Change>),
 }
 
 /// A model being annotated.
@@ -178,10 +180,7 @@ impl Workspace {
         let Some(c) = self.undo.pop() else {
             return false;
         };
-        match &c {
-            Change::Meta { element, before, .. } => *self.meta_mut(*element) = (**before).clone(),
-            Change::Document { before, .. } => self.doc = (**before).clone(),
-        }
+        self.revert(&c);
         self.redo.push(c);
         true
     }
@@ -191,12 +190,38 @@ impl Workspace {
         let Some(c) = self.redo.pop() else {
             return false;
         };
-        match &c {
-            Change::Meta { element, after, .. } => *self.meta_mut(*element) = (**after).clone(),
-            Change::Document { after, .. } => self.doc = (**after).clone(),
-        }
+        self.reapply(&c);
         self.undo.push(c);
         true
+    }
+
+    /// Makes every edit `f` makes one undoable step: Undo reverts them all
+    /// at once. Edits that change nothing are not recorded, and a batch
+    /// with no edits adds no step.
+    pub fn batch<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let start = self.undo.len();
+        let r = f(self);
+        if self.undo.len() > start + 1 {
+            let group = self.undo.split_off(start);
+            self.undo.push(Change::Group(group));
+        }
+        r
+    }
+
+    fn revert(&mut self, c: &Change) {
+        match c {
+            Change::Meta { element, before, .. } => *self.meta_mut(*element) = (**before).clone(),
+            Change::Document { before, .. } => self.doc = (**before).clone(),
+            Change::Group(cs) => cs.iter().rev().for_each(|c| self.revert(c)),
+        }
+    }
+
+    fn reapply(&mut self, c: &Change) {
+        match c {
+            Change::Meta { element, after, .. } => *self.meta_mut(*element) = (**after).clone(),
+            Change::Document { after, .. } => self.doc = (**after).clone(),
+            Change::Group(cs) => cs.iter().for_each(|c| self.reapply(c)),
+        }
     }
 
     fn meta(&self, el: Element) -> &sbml_io::Meta {
