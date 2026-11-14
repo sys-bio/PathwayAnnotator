@@ -383,3 +383,41 @@ fn annotating_the_model_itself() {
     }
     assert_eq!(w.to_sbml(), before);
 }
+
+#[test]
+fn creators_dates_and_notes() {
+    use annot_model::{Creator, History};
+    let mut w = load(MODEL).unwrap();
+    let before = w.to_sbml();
+    let paper = "https://identifiers.org/pubmed:26476456";
+    w.add_terms_as(Element::Model, true, "isDescribedBy", &[paper.to_string()]).unwrap();
+    let history = History {
+        creators: vec![Creator {
+            family: Some("Smith".into()),
+            given: Some("Jane".into()),
+            email: Some("jane@example.org".into()),
+            organization: Some("Example University".into()),
+        }],
+        created: Some("2026-11-14T00:00:00Z".into()),
+        modified: vec!["2026-11-14T10:30:00Z".into()],
+    };
+    w.set_history(Element::Model, history.clone()).unwrap();
+    w.set_notes_text(Element::Model, "A model of glycolysis.\n\nFitted to 2026 data & more.").unwrap();
+    let text = w.to_sbml();
+    let again = load(&text).unwrap();
+    assert_eq!(again.history(Element::Model), history);
+    // The terms are kept beside the history.
+    assert!(again.terms(Element::Model).iter().any(|t| t.uri == paper));
+    assert_eq!(
+        again.notes_text(Element::Model).as_deref(),
+        Some("A model of glycolysis.\n\nFitted to 2026 data & more.")
+    );
+    assert!(!again.notes_are_rich(Element::Model));
+    // Empty notes remove them.
+    w.set_notes_text(Element::Model, "  ").unwrap();
+    assert_eq!(w.notes_text(Element::Model), None);
+    for _ in 0..4 {
+        assert!(w.undo());
+    }
+    assert_eq!(w.to_sbml(), before);
+}

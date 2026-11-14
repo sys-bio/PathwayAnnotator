@@ -9,7 +9,9 @@ use leptos::prelude::*;
 use leptos::task::spawn_local;
 
 use crate::browser;
-use crate::session::{Counts, Session, Status, qualifier_choices, qualifier_key, sbo_choices};
+use crate::session::{
+    Counts, Session, Status, creator_name, qualifier_choices, qualifier_key, readable_date, sbo_choices,
+};
 
 type SessionSignal = RwSignal<Option<Session>, LocalStorage>;
 
@@ -66,6 +68,8 @@ struct Ctx {
     help: RwSignal<bool>,
     /// Whether the About panel (data sources and licenses) is showing.
     about: RwSignal<bool>,
+    /// Whether the Help page (how to use the annotator) is showing.
+    guide: RwSignal<bool>,
     /// The knowledge pack's header: when it was built, and its sources
     /// with their licenses and the notices they require.
     pack_header: RwSignal<Option<kpack::Header>>,
@@ -148,6 +152,7 @@ pub fn App() -> impl IntoView {
         cursor: RwSignal::new(None),
         help: RwSignal::new(false),
         about: RwSignal::new(false),
+        guide: RwSignal::new(false),
         pack_header: RwSignal::new(None),
     };
     provide_context(ctx);
@@ -204,6 +209,7 @@ pub fn App() -> impl IntoView {
                     view! { <Start open=open/> }.into_any()
                 } else {
                     view! {
+                        <Intro/>
                         <Overview/>
                         <Tabs/>
                     }
@@ -213,6 +219,7 @@ pub fn App() -> impl IntoView {
             <Message/>
             <Shortcuts/>
             <About/>
+            <Help/>
         </main>
     }
 }
@@ -244,6 +251,14 @@ fn Header() -> impl IntoView {
                 on:click=move |_| ctx.help.update(|h| *h = !*h)
             >
                 "Shortcuts " <kbd>"?"</kbd>
+            </button>
+            <button
+                class="link"
+                title="How to use the annotator"
+                aria-expanded=move || ctx.guide.get().to_string()
+                on:click=move |_| ctx.guide.update(|g| *g = !*g)
+            >
+                "Help"
             </button>
             <button
                 class="link"
@@ -1364,8 +1379,193 @@ fn ModelPanel() -> impl IntoView {
             <p class="hint">"Saved as bqbiol:hasTaxon; protein searches start with it."</p>
             {move || error.get().map(|e| view! { <p class="error" role="alert">{e}</p> })}
 
+            <ModelHistory/>
+            <ModelNotes/>
+
             <OnlineSearch el=el/>
         </section>
+    }
+}
+
+/// Who made the model and when: its creators (name, organization,
+/// email) and its created and modified dates, the MIRIAM history. Editing
+/// fills in what SBML tools expect (a created date, a modification today).
+#[component]
+fn ModelHistory() -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    let s = ctx.session;
+    let history = move || s.with(|s| s.as_ref().map(|s| s.history()).unwrap_or_default());
+    let error = RwSignal::new(None::<String>);
+    let (given, family, org, email) =
+        (RwSignal::new(String::new()), RwSignal::new(String::new()), RwSignal::new(String::new()), RwSignal::new(String::new()));
+    let run = move |f: SessionEdit| {
+        let mut out = None;
+        s.update(|s| {
+            if let Some(s) = s {
+                out = Some(f(s));
+            }
+        });
+        match out {
+            Some(Ok(msg)) => {
+                error.set(None);
+                ctx.message.set(Some(msg));
+            }
+            Some(Err(e)) => error.set(Some(e)),
+            None => {}
+        }
+    };
+    let add = move || {
+        let field = |x: RwSignal<String>| Some(x.get_untracked());
+        let c = annot_model::Creator {
+            given: field(given),
+            family: field(family),
+            organization: field(org),
+            email: field(email),
+        };
+        let now = browser::now();
+        run(Box::new(move |s| s.add_creator(c, &now)));
+        if error.get_untracked().is_none() {
+            for x in [given, family, org, email] {
+                x.set(String::new());
+            }
+        }
+    };
+    let field = move |sig: RwSignal<String>, placeholder: &'static str, kind: &'static str| {
+        view! {
+            <input
+                type=kind
+                placeholder=placeholder
+                prop:value=move || sig.get()
+                on:input=move |ev| sig.set(event_target_value(&ev))
+                on:keydown=move |ev: web_sys::KeyboardEvent| {
+                    if ev.key() == "Enter" {
+                        add();
+                    }
+                }
+            />
+        }
+    };
+    let creators = move || {
+        history()
+            .creators
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| {
+                let extra: Vec<String> = [c.organization.clone(), c.email.clone()].into_iter().flatten().collect();
+                view! {
+                    <li>
+                        <b>{creator_name(&c)}</b>
+                        {(!extra.is_empty()).then(|| view! { <span class="muted">{extra.join(", ")}</span> })}
+                        <button
+                            class="link"
+                            on:click=move |_| {
+                                let now = browser::now();
+                                run(Box::new(move |s| s.remove_creator(i, &now)));
+                            }
+                        >
+                            "Remove"
+                        </button>
+                    </li>
+                }
+            })
+            .collect_view()
+    };
+    let created = move || history().created.map(|c| c.get(..10).unwrap_or(&c).to_string()).unwrap_or_default();
+    let modified = move || {
+        let m = history().modified;
+        if m.is_empty() { "none recorded".to_string() } else { m.iter().map(|d| readable_date(d)).collect::<Vec<_>>().join("; ") }
+    };
+    view! {
+        <h4>"Creators"</h4>
+        <ul class="terms edit creators">{creators}</ul>
+        <div class="add-term creator-form">
+            {field(given, "Given name", "text")}
+            {field(family, "Family name", "text")}
+            {field(org, "Organization", "text")}
+            {field(email, "Email", "email")}
+            <button on:click=move |_| add()>"Add creator"</button>
+        </div>
+        <h4>"Dates"</h4>
+        <div class="add-term">
+            <label>
+                <span class="muted">"Created "</span>
+                <input
+                    type="date"
+                    prop:value=created
+                    on:change=move |ev| {
+                        let d = event_target_value(&ev);
+                        let now = browser::now();
+                        run(Box::new(move |s| s.set_created(&d, &now)));
+                    }
+                />
+            </label>
+            <span class="muted">"Modified: " {modified}</span>
+            <button on:click=move |_| {
+                let now = browser::now();
+                run(Box::new(move |s| s.record_modified(&now)));
+            }>"Record today as modified"</button>
+        </div>
+        <p class="hint">
+            "Saved as the model's history (dcterms and vCard in its annotation). SBML tools expect a creator, a "
+            "created date and a modified date, so changing these fills in a missing created date and today's "
+            "modification. Each change can be undone."
+        </p>
+        {move || error.get().map(|e| view! { <p class="error" role="alert">{e}</p> })}
+    }
+}
+
+/// The model's notes, as plain text: paragraphs separated by blank lines.
+/// Saved as XHTML paragraphs; notes with links, lists or tables are shown
+/// as text, and a warning says saving replaces that formatting.
+#[component]
+fn ModelNotes() -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    let s = ctx.session;
+    let saved = Memo::new(move |_| s.with(|s| s.as_ref().map(|s| s.notes()).unwrap_or_default()));
+    let draft = RwSignal::new(saved.get_untracked().0);
+    // Undo, redo or saving changes the notes: show them.
+    Effect::new(move |_| draft.set(saved.get().0));
+    let changed = move || draft.get() != saved.get().0;
+    let save = move |_| {
+        let text = draft.get_untracked();
+        let mut msg = None;
+        s.update(|s| {
+            if let Some(s) = s {
+                msg = Some(s.set_notes(&text));
+            }
+        });
+        match msg {
+            Some(Ok(m)) | Some(Err(m)) => ctx.message.set(Some(m)),
+            None => {}
+        }
+    };
+    view! {
+        <h4>"Notes"</h4>
+        {move || {
+            saved
+                .get()
+                .1
+                .then(|| {
+                    view! {
+                        <p class="hint warn">
+                            "These notes have formatting (links, lists or tables), shown here as text. Saving "
+                            "replaces them with plain paragraphs; Undo brings the original back."
+                        </p>
+                    }
+                })
+        }}
+        <textarea
+            class="notes"
+            rows="6"
+            placeholder="What the model is, where it comes from, how it was fitted..."
+            prop:value=move || draft.get()
+            on:input=move |ev| draft.set(event_target_value(&ev))
+        ></textarea>
+        <div class="add-term">
+            <button class="primary" disabled=move || !changed() on:click=save>"Save notes"</button>
+            <button disabled=move || !changed() on:click=move |_| draft.set(saved.get_untracked().0)>"Revert"</button>
+            <span class="muted">"A blank line starts a new paragraph."</span>
+        </div>
     }
 }
 
@@ -1994,7 +2194,9 @@ fn on_key(ctx: Ctx, ev: web_sys::KeyboardEvent) {
     match key.as_str() {
         "?" => ctx.help.update(|h| *h = !*h),
         "Escape" => {
-            if ctx.about.get_untracked() {
+            if ctx.guide.get_untracked() {
+                ctx.guide.set(false);
+            } else if ctx.about.get_untracked() {
                 ctx.about.set(false);
             } else if ctx.help.get_untracked() {
                 ctx.help.set(false);
@@ -2164,14 +2366,22 @@ fn About() -> impl IntoView {
                     <h3>"About PathwayAnnotator"</h3>
                     <button class="link" on:click=move |_| ctx.about.set(false)>"Close"</button>
                 </div>
+                <p class="version">"Version " {env!("CARGO_PKG_VERSION")}</p>
                 <p>
                     "Suggests what each molecule, reaction and compartment of an SBML or Antimony model is, "
                     "with the evidence, for you to confirm. It runs in your browser: your model is not uploaded. "
-                    "Version " {env!("CARGO_PKG_VERSION")} ". "
                     <a href="https://github.com/sys-bio/PathwayAnnotator" target="_blank" rel="noopener noreferrer">
                         "Source code"
                     </a>
                     " (MIT or Apache-2.0)."
+                </p>
+                <p>"Conceived by Herbert Sauro, assisted by Claude Code."</p>
+                <p>
+                    "This work was supported by NIH Biomedical Imaging and Bioengineering award P41 EB023912 "
+                    "through HMS at the Center for Reproducible Biomedical Modeling "
+                    <a href="https://reproduciblebiomodels.org" target="_blank" rel="noopener noreferrer">
+                        "reproduciblebiomodels.org"
+                    </a>
                 </p>
                 <h3>"Data in the knowledge base"</h3>
                 <p class="muted">{move || built().map(|b| format!("Built {b} from:"))}</p>
@@ -2181,6 +2391,142 @@ fn About() -> impl IntoView {
                     "Search other databases (in Details) sends the search text, or ChEBI ids and EC numbers, to: "
                     "EBI's Ontology Lookup Service for ChEBI and the Gene Ontology, UniProt, and Rhea "
                     "(all CC BY 4.0). Nothing is sent otherwise."
+                </p>
+            </div>
+        </Show>
+    }
+}
+
+/// A few lines at the top of the annotation page saying what the tool is
+/// for and how to start, so it does not look mysterious; the Help page has
+/// the rest.
+#[component]
+fn Intro() -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    view! {
+        <section class="intro">
+            <p>
+                "Annotating a model links each molecule, reaction and compartment to the database entry it "
+                "stands for (ChEBI, Rhea, KEGG, GO and others), so people and software can tell what it is. "
+                "Annotated models are easier to find, check, reuse and combine; the curated models in BioModels "
+                "are annotated this way."
+            </p>
+            <p>
+                "Below, each element has a suggestion with a confidence level. Open "
+                <b>"Details"</b>
+                " to see the evidence and check the entry, then "
+                <b>"Accept"</b>
+                " or "
+                <b>"Reject"</b>
+                ". A good start: accept all high-confidence suggestions, then work through the rest. When you "
+                "are done, save the annotated SBML. "
+                <button class="link" on:click=move |_| ctx.guide.set(true)>"More help"</button>
+            </p>
+        </section>
+    }
+}
+
+/// How to use the annotator, step by step: what annotation is for, a way
+/// to work through a model, what the confidence levels mean, what to do
+/// when there is no suggestion, editing, the model itself, and privacy.
+#[component]
+fn Help() -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    view! {
+        <Show when=move || ctx.guide.get()>
+            <div class="about-backdrop" on:click=move |_| ctx.guide.set(false)></div>
+            <div class="about help" role="dialog" aria-label="Help">
+                <div class="shortcuts-head">
+                    <h3>"How to use PathwayAnnotator"</h3>
+                    <button class="link" on:click=move |_| ctx.guide.set(false)>"Close"</button>
+                </div>
+
+                <h4>"What it is for"</h4>
+                <p>
+                    "A model's species and reactions usually have short names (G6P, vPFK) that only make sense to "
+                    "the person who wrote them. Annotations link each one to a database entry: G6P is ChEBI "
+                    "CHEBI:4170, D-glucose 6-phosphate. They are stored in the SBML file in a standard form (MIRIAM "
+                    "annotations and SBO terms), so other people and tools can tell exactly what the model contains, "
+                    "compare it with other models, and reuse its parts."
+                </p>
+
+                <h4>"A good way to work"</h4>
+                <ol>
+                    <li>"Open your model (SBML or Antimony). It stays on your computer."</li>
+                    <li>
+                        "Press " <b>"Accept all high-confidence suggestions"</b>
+                        ". In tests these were right about 99% of the time. Undo reverts them in one step."
+                    </li>
+                    <li>
+                        "Work through the rest of " <b>"Molecules"</b> ": open " <b>"Details"</b>
+                        " to see why each suggestion was made, follow the link to check the database entry, then "
+                        "Accept, pick another candidate, or Reject. Synonyms are shown, so D-glucopyranose is "
+                        "recognizable as glucose."
+                    </li>
+                    <li>
+                        "Then " <b>"Reactions"</b>
+                        ". Confirmed molecules make reaction suggestions much better: a reaction whose molecules are "
+                        "all confirmed and that matches one database reaction becomes high confidence. Hover over a "
+                        "molecule in a reaction to check it without leaving the reaction."
+                    </li>
+                    <li>"Then " <b>"Compartments"</b> " (GO cellular components)."</li>
+                    <li>
+                        "Then " <b>"Model"</b>
+                        ": the modelling framework, the papers describing the model, its organism, the process it "
+                        "describes, its creators and dates, and notes."
+                    </li>
+                    <li>"Press " <b>"Save annotated SBML"</b> " to download the annotated model."</li>
+                </ol>
+
+                <h4>"Confidence levels"</h4>
+                <ul>
+                    <li><b>"High confidence"</b>": strong, unambiguous evidence; right about 99% of the time in tests."</li>
+                    <li><b>"Likely"</b>": good evidence; check it."</li>
+                    <li><b>"Uncertain"</b>": weak or conflicting evidence; check it carefully."</li>
+                    <li><b>"No suggestion"</b>": the knowledge base has nothing; search other databases (below)."</li>
+                </ul>
+                <p>
+                    "The annotator learns from you: each molecule or reaction you confirm or reject improves the "
+                    "suggestions for the elements around it."
+                </p>
+
+                <h4>"When there is no suggestion"</h4>
+                <p>
+                    "Details has " <b>"Search other databases"</b>
+                    ": all of ChEBI and reviewed UniProt proteins for a molecule, Rhea for a reaction (by its "
+                    "molecules, or by enzyme name or EC number), and GO for a compartment or the model's process. "
+                    "Nothing is sent anywhere until you press Search; the text beside the button says what is sent "
+                    "and to whom."
+                </p>
+
+                <h4>"Editing"</h4>
+                <ul>
+                    <li>
+                        <b>"Annotation"</b>
+                        " (in Details) shows every term. Change a qualifier: \"is\" means it is that entry, "
+                        "\"is a version of\" points to a more general one (glucose for alpha-D-glucose), \"has part\" "
+                        "lists the members of a complex. Remove a term, or add one by typing an id such as "
+                        "CHEBI:15422 or uniprot:P12345."
+                    </li>
+                    <li>
+                        <b>"Kind (SBO term)"</b>
+                        " says what sort of thing an element is: simple chemical, protein, biochemical reaction, ..."
+                    </li>
+                    <li>
+                        <b>"Rename"</b>
+                        " (in Details) changes an element's SBML id everywhere it is used, rate laws included."
+                    </li>
+                    <li>"Every change can be undone (Undo, or Ctrl+Z)."</li>
+                    <li>
+                        "Keyboard: j and k move between rows, a accepts, r rejects; press ? for the full list."
+                    </li>
+                </ul>
+
+                <h4>"Privacy"</h4>
+                <p>
+                    "Your model is read and annotated in your browser and is never uploaded. The suggestions come "
+                    "from a knowledge base downloaded with the page (see About). Only the searches you start send "
+                    "anything: the search text, ChEBI ids or EC numbers, or paper ids for their titles."
                 </p>
             </div>
         </Show>
@@ -2202,7 +2548,7 @@ fn Shortcuts() -> impl IntoView {
         (&["1", "2", "3", "4"], "Molecules, Reactions, Compartments, Model"),
         (&["Ctrl+Z"], "undo"),
         (&["Ctrl+Y", "Ctrl+Shift+Z"], "redo"),
-        (&["Esc"], "close About, this, a pinned card, or the details"),
+        (&["Esc"], "close Help, About, this, a pinned card, or the details"),
         (&["?"], "show or hide this list"),
     ];
     view! {

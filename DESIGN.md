@@ -701,8 +701,22 @@ Known issues / next (in order):
   sets the protein search's organism. What the model describes: a search
   of GO's biological processes (`annot_online::go_process_url`, under
   GO:0008150), accepted as `bqbiol:isVersionOf`. Checked in Chrome on the
-  glycolysis example, including undo and redo of each change. Not yet:
-  creators and dates (the vCard history block).
+  glycolysis example, including undo and redo of each change.
+- Done (2026-11-14): the model's creators (name, organization, email),
+  created and modified dates (the MIRIAM history: `Workspace::history`,
+  `set_history`, one undo step; the rest of the annotation is kept), and
+  notes as plain text (`notes_text`, `set_notes_text`: paragraphs become
+  XHTML `<p>`, line breaks `<br/>`; notes with links, lists or tables are
+  read as text and flagged, `notes_are_rich`, and the app warns that
+  saving replaces the formatting). As SBML tools expect a creator, a
+  created date and a modified date, history edits fill in a missing
+  created date and today's modification (`browser::now`, W3CDTF UTC).
+- Done (2026-11-14): a short "what this is for" paragraph above the
+  overview, a Help page (header; what annotation is for, a way to work
+  through a model, confidence levels, no suggestion, editing, privacy),
+  and in About the version (1.0.0, the app's package version), "Conceived
+  by Herbert Sauro, assisted by Claude Code" and the NIH funding statement
+  (P41 EB023912, Center for Reproducible Biomedical Modeling).
 - Done (2026-11-14): editing the annotation in Details ("Annotation"). The
   SBO term from a menu of terms that suit the element (molecules: simple
   chemical, ion, protein, complex, RNA, DNA, gene, ...; reactions:

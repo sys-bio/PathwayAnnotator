@@ -166,6 +166,20 @@ pub fn sbo_choices(el: Element) -> &'static [(u32, &'static str)] {
     }
 }
 
+/// A creator as a person reads it: "Jane Smith".
+pub fn creator_name(c: &annot_model::Creator) -> String {
+    let parts: Vec<&str> = [c.given.as_deref(), c.family.as_deref()].into_iter().flatten().collect();
+    if parts.is_empty() { "(no name)".into() } else { parts.join(" ") }
+}
+
+/// A W3CDTF date as people read it: "2026-11-14T10:30:00Z" ->
+/// "2026-11-14 10:30 UTC", "2026-11-14T00:00:00Z" -> "2026-11-14".
+pub fn readable_date(w3c: &str) -> String {
+    let (date, time) = w3c.split_once('T').unwrap_or((w3c, ""));
+    let hm = time.get(..5).unwrap_or("");
+    if hm.is_empty() || hm == "00:00" { date.to_string() } else { format!("{date} {hm} UTC") }
+}
+
 /// Counts for the overview.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Counts {
@@ -935,6 +949,96 @@ impl Session {
             }
             None => "The model no longer names an organism.".into(),
         })
+    }
+
+    /// Who made the model and when.
+    pub fn history(&self) -> annot_model::History {
+        self.ws.history(Element::Model)
+    }
+
+    /// Changes the model's history with `f`, then fills in what SBML tools
+    /// expect of one: a created date (`now`, if there is none) and a
+    /// modified date for today (`now`, unless one is there already). `now`
+    /// is a W3CDTF date and time ("2026-11-14T22:50:12Z"). One undo step.
+    fn change_history(&mut self, now: &str, done: String, f: impl FnOnce(&mut annot_model::History)) -> Result<String, String> {
+        let mut h = self.history();
+        f(&mut h);
+        if !h.is_empty() {
+            if h.created.is_none() {
+                h.created = Some(now.to_string());
+            }
+            let today = now.get(..10).unwrap_or(now);
+            if !h.modified.iter().any(|m| m.starts_with(today)) {
+                h.modified.push(now.to_string());
+            }
+        }
+        self.ws
+            .set_history(Element::Model, h)
+            .map_err(|e| format!("Could not change the model: {e}."))?;
+        self.refresh();
+        Ok(done)
+    }
+
+    /// Adds a creator. A family or given name is needed.
+    pub fn add_creator(&mut self, c: annot_model::Creator, now: &str) -> Result<String, String> {
+        let clean = |s: Option<String>| s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        let c = annot_model::Creator {
+            family: clean(c.family),
+            given: clean(c.given),
+            email: clean(c.email),
+            organization: clean(c.organization),
+        };
+        if c.family.is_none() && c.given.is_none() {
+            return Err("A creator needs a name (given or family).".into());
+        }
+        if c.email.as_deref().is_some_and(|e| !e.contains('@') || e.contains(char::is_whitespace)) {
+            return Err("That email address does not look right.".into());
+        }
+        let who = creator_name(&c);
+        self.change_history(now, format!("Added {who} as a creator."), |h| h.creators.push(c))
+    }
+
+    /// Removes the creator at `index`.
+    pub fn remove_creator(&mut self, index: usize, now: &str) -> Result<String, String> {
+        let who = self.history().creators.get(index).map(creator_name).ok_or("No such creator.")?;
+        self.change_history(now, format!("Removed {who} from the creators."), |h| {
+            h.creators.remove(index);
+        })
+    }
+
+    /// Sets the created date from a calendar date ("2026-11-14").
+    pub fn set_created(&mut self, date: &str, now: &str) -> Result<String, String> {
+        let d = date.trim();
+        let ok = d.len() == 10 && d.chars().enumerate().all(|(i, c)| if i == 4 || i == 7 { c == '-' } else { c.is_ascii_digit() });
+        if !ok {
+            return Err("Give the date as YYYY-MM-DD.".into());
+        }
+        let when = format!("{d}T00:00:00Z");
+        self.change_history(now, format!("The model was created on {d}."), |h| h.created = Some(when))
+    }
+
+    /// Records that the model was modified now.
+    pub fn record_modified(&mut self, now: &str) -> Result<String, String> {
+        let today = now.get(..10).unwrap_or(now).to_string();
+        self.change_history(now, format!("Recorded a modification on {today}."), |_| {})
+    }
+
+    /// The model's notes as plain text, and whether they have formatting
+    /// that saving plain text would replace.
+    pub fn notes(&self) -> (String, bool) {
+        (
+            self.ws.notes_text(Element::Model).unwrap_or_default(),
+            self.ws.notes_are_rich(Element::Model),
+        )
+    }
+
+    /// Replaces the model's notes with plain text (empty removes them).
+    pub fn set_notes(&mut self, text: &str) -> Result<String, String> {
+        self.ws
+            .set_notes_text(Element::Model, text)
+            .map_err(|e| format!("Could not change the notes: {e}."))?;
+        self.refresh();
+        Ok(if text.trim().is_empty() { "Removed the model's notes.".into() } else { "Saved the model's notes.".into() })
     }
 
     /// A paper looked up for a reference, if it has been.

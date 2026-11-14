@@ -41,6 +41,15 @@ pub async fn fetch_text(url: &str) -> Result<String, String> {
     text.as_string().ok_or_else(|| "the answer is not text".into())
 }
 
+/// The time now as W3CDTF, in UTC to the second: "2026-11-14T22:50:12Z".
+pub fn now() -> String {
+    let iso = String::from(js_sys::Date::new_0().to_iso_string());
+    match iso.split_once('.') {
+        Some((head, _)) => format!("{head}Z"),
+        None => iso,
+    }
+}
+
 /// Where the names of entries accepted from other databases are kept, in
 /// this browser only.
 const NAMES_KEY: &str = "pathwayannotator.online-names";

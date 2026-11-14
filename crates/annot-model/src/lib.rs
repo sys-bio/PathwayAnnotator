@@ -20,6 +20,7 @@
 //! No I/O; works in WebAssembly.
 
 mod edit;
+mod history;
 mod rename;
 mod resolve;
 mod uris;
@@ -29,6 +30,7 @@ pub use edit::{EditError, Term};
 pub use rename::{RenameError, is_valid_id, references_left};
 pub use resolve::{Resolution, resolve};
 pub use edit::{BIOLOGY_QUALIFIERS, MODEL_QUALIFIERS};
+pub use sbml_io::miriam::{Creator, History};
 pub use uris::{reference_uri, sbo_for, uri, uri_from_text, uris_for};
 
 use std::fmt;

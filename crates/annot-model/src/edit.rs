@@ -289,6 +289,16 @@ impl Workspace {
         el: Element,
         f: impl FnOnce(&mut Vec<CvTerm>) -> Result<(), EditError>,
     ) -> Result<sbml_io::Meta, EditError> {
+        self.with_annotation(el, |terms, _| f(terms))
+    }
+
+    /// The element's metadata with its terms and history changed by `f`,
+    /// everything else in its annotation kept.
+    pub(crate) fn with_annotation(
+        &self,
+        el: Element,
+        f: impl FnOnce(&mut Vec<CvTerm>, &mut miriam::History) -> Result<(), EditError>,
+    ) -> Result<sbml_io::Meta, EditError> {
         if !self.contains(el) {
             return Err(EditError::NoSuchElement);
         }
@@ -298,16 +308,17 @@ impl Workspace {
             return Err(EditError::UnreadableRdf);
         }
         let mut terms = ann.terms.clone();
-        f(&mut terms)?;
+        let mut history = ann.history.clone();
+        f(&mut terms, &mut history)?;
         terms.retain(|t| !t.resources.is_empty());
-        if terms == ann.terms {
+        if terms == ann.terms && history == ann.history {
             return Ok(before);
         }
         let metaid = match &before.metaid {
             Some(m) => m.clone(),
             None => self.new_metaid(self.element_id(el)),
         };
-        let rdf = miriam::write_annotation(&metaid, &terms, &ann.history, &ann.descriptions);
+        let rdf = miriam::write_annotation(&metaid, &terms, &history, &ann.descriptions);
         let mut parts: Vec<String> = ann.other.iter().map(|o| o.xml.clone()).collect();
         parts.extend(rdf);
         let mut meta = before;
@@ -319,7 +330,7 @@ impl Workspace {
     }
 
     /// Records and makes a change, unless it changes nothing.
-    fn apply(&mut self, el: Element, after: sbml_io::Meta) {
+    pub(crate) fn apply(&mut self, el: Element, after: sbml_io::Meta) {
         let before = self.meta(el).clone();
         if before == after {
             return;
