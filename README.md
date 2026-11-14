@@ -39,6 +39,10 @@ first for about 91% of species and 82% of reactions (metabolism). Each
 suggestion carries a confidence level; "high" ones were right about 99% of
 the time.
 
+## Supported by:
+
+This work was supported by NIH Biomedical Imaging and Bioengineering award P41 EB023912 through HMS at the Center for Reproducible Biomedical Modeling reproduciblebiomodels.org
+
 ## Layout
 
 | Crate | What it is |
