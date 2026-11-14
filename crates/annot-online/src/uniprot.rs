@@ -7,17 +7,49 @@ use crate::{Db, Hit, names_match};
 /// How many entries to ask for.
 const SIZE: usize = 10;
 
-/// The UniProt search for reviewed proteins named `text` (protein or gene
-/// name), optionally in one organism (an NCBI taxon id: 9606 is human).
-pub fn uniprot_url(text: &str, taxon: Option<u32>) -> String {
+/// Organisms people model most, for choosing whose proteins to search:
+/// (NCBI taxon id, name). Searches include strains and subspecies (the
+/// yeast entry finds S288C's proteins).
+pub const ORGANISMS: &[(u32, &str)] = &[
+    (9606, "Human"),
+    (10090, "Mouse"),
+    (10116, "Rat"),
+    (4932, "Baker's yeast (S. cerevisiae)"),
+    (562, "E. coli"),
+    (1423, "B. subtilis"),
+    (1773, "M. tuberculosis"),
+    (3702, "Arabidopsis thaliana"),
+    (7227, "Fruit fly (D. melanogaster)"),
+    (6239, "C. elegans"),
+    (7955, "Zebrafish"),
+];
+
+/// The query text for reviewed proteins named `text` (protein or gene
+/// name), optionally in one organism and its strains (an NCBI taxon id:
+/// 9606 is human).
+fn query(text: &str, taxon: Option<u32>) -> String {
     let t = text.trim().replace('"', "");
     let mut q = format!("(protein_name:\"{t}\" OR gene:\"{t}\") AND reviewed:true");
     if let Some(taxon) = taxon {
-        q.push_str(&format!(" AND organism_id:{taxon}"));
+        q.push_str(&format!(" AND taxonomy_id:{taxon}"));
     }
+    q
+}
+
+/// The UniProt search for reviewed proteins named `text`.
+pub fn uniprot_url(text: &str, taxon: Option<u32>) -> String {
     format!(
         "https://rest.uniprot.org/uniprotkb/search?query={}&fields=accession,protein_name,organism_name,gene_primary,ec&size={SIZE}&format=tsv",
-        percent_encode(&q)
+        percent_encode(&query(text, taxon))
+    )
+}
+
+/// The same search for finding an enzyme's EC numbers: more entries, as
+/// only their EC numbers are used ([`crate::ecs_of_proteins`]).
+pub fn uniprot_ec_url(text: &str, taxon: Option<u32>) -> String {
+    format!(
+        "https://rest.uniprot.org/uniprotkb/search?query={}&fields=accession,protein_name,organism_name,gene_primary,ec&size=50&format=tsv",
+        percent_encode(&query(&text.trim().replace('"', ""), taxon))
     )
 }
 
@@ -80,8 +112,11 @@ pub fn parse_uniprot(tsv: &str, query: &str) -> Result<Vec<Hit>, String> {
         if let Some(g) = gene {
             detail.push(format!("gene {g}"));
         }
-        if let Some(ec) = get(4) {
-            detail.push(format!("EC {ec}"));
+        let ec: Vec<String> = get(4)
+            .map(|e| e.split(';').map(str::trim).filter(|x| !x.is_empty()).map(String::from).collect())
+            .unwrap_or_default();
+        if !ec.is_empty() {
+            detail.push(format!("EC {}", ec.join(", ")));
         }
         let exact = names_match(query, &label, &synonyms);
         hits.push(Hit {
@@ -94,6 +129,7 @@ pub fn parse_uniprot(tsv: &str, query: &str) -> Result<Vec<Hit>, String> {
             exact,
             score: -(rank as f32),
             why: exact.then(|| "Its name or gene is the search text".to_string()),
+            ec,
         });
     }
     Ok(hits)
@@ -115,7 +151,7 @@ mod tests {
     #[test]
     fn url() {
         let u = uniprot_url("PFK1", Some(9606));
-        assert!(u.contains("organism_id%3A9606"), "{u}");
+        assert!(u.contains("taxonomy_id%3A9606"), "{u}");
         assert!(u.contains("reviewed%3Atrue"));
     }
 }

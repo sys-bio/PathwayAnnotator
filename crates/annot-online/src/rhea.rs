@@ -11,8 +11,9 @@ const LIMIT: usize = 50;
 pub struct Participant {
     /// What the model calls it.
     pub name: String,
-    /// What it is identified as ("keto-D-fructose 6-phosphate"), when it
-    /// is: compared with Rhea's names when its ids are not Rhea's.
+    /// What it is identified as ("keto-D-fructose 6-phosphate"), or else
+    /// what the annotator suggests it is: compared with Rhea's names when
+    /// its ids are not Rhea's (or it has none).
     pub label: Option<String>,
     /// Its ChEBI ids ("CHEBI:4167"), every charge form, when it is
     /// identified; empty when not.
@@ -31,6 +32,8 @@ pub enum RheaQuery {
     ByIds(Vec<Vec<String>>),
     /// Reactions naming all these molecules, when none is identified.
     ByNames(Vec<String>),
+    /// Reactions of any of these EC numbers: the enzyme's activities.
+    ByEc(Vec<String>),
 }
 
 impl RheaQuery {
@@ -67,6 +70,7 @@ impl RheaQuery {
                 .into_iter()
                 .map(|keep| RheaQuery::ByNames(keep.into_iter().map(|i| n[i].clone()).collect()))
                 .collect(),
+            RheaQuery::ByEc(_) => Vec::new(),
         }
     }
 
@@ -86,8 +90,40 @@ impl RheaQuery {
                 .map(|n| format!("\"{}\"", n.replace('"', "")))
                 .collect::<Vec<_>>()
                 .join(" AND "),
+            RheaQuery::ByEc(ecs) => ecs.iter().map(|e| format!("ec:{e}")).collect::<Vec<_>>().join(" OR "),
         }
     }
+}
+
+/// An EC number written in `text`, if that is all it is: "2.7.1.11",
+/// "EC 2.7.1.11", "ec:2.7.1.11". Only complete numbers (four parts; the
+/// last may be "n" plus digits, as in "3.1.1.n2").
+pub fn ec_from_text(text: &str) -> Option<String> {
+    let t = text.trim();
+    let t = ["EC:", "ec:", "EC ", "ec ", "EC", "ec"].iter().find_map(|p| t.strip_prefix(p)).unwrap_or(t).trim();
+    let parts: Vec<&str> = t.split('.').collect();
+    let number = |p: &str| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit());
+    let ok = parts.len() == 4
+        && parts[..3].iter().all(|p| number(p))
+        && (number(parts[3]) || parts[3].strip_prefix('n').is_some_and(number));
+    ok.then(|| t.to_string())
+}
+
+/// The EC numbers of an enzyme, from the proteins a name search found:
+/// those of proteins with exactly that name if any, else of all of them;
+/// complete numbers only, most common first, at most three.
+pub fn ecs_of_proteins(proteins: &[Hit]) -> Vec<String> {
+    let exact: Vec<&Hit> = proteins.iter().filter(|h| h.exact).collect();
+    let from: Vec<&Hit> = if exact.is_empty() { proteins.iter().collect() } else { exact };
+    let mut counts: Vec<(String, usize)> = Vec::new();
+    for e in from.iter().flat_map(|h| &h.ec).filter_map(|e| ec_from_text(e)) {
+        match counts.iter_mut().find(|(x, _)| *x == e) {
+            Some(c) => c.1 += 1,
+            None => counts.push((e, 1)),
+        }
+    }
+    counts.sort_by_key(|c| std::cmp::Reverse(c.1));
+    counts.into_iter().take(3).map(|(e, _)| e).collect()
 }
 
 /// The Rhea search URL for a query.
@@ -148,12 +184,15 @@ fn hit(r: Row, score: f32, why: Option<String>) -> Hit {
         exact: false,
         score,
         why,
+        ec: r.ec,
     }
 }
 
 /// How alike two molecule names must be ([`word_likeness`]) to count as
-/// probably the same molecule in another form.
-const ALIKE: f32 = 0.6;
+/// probably the same molecule in another form. Names differing only in
+/// the sugar ("D-tagatose 1,6-bisphosphate", "D-fructose 1,6-bisphosphate",
+/// 0.6) do not.
+const ALIKE: f32 = 0.7;
 
 /// The words of a molecule name that say what it is: "keto-D-fructose
 /// 6-phosphate" -> fructose, 6, phosphate. Stereo and form prefixes (D,
@@ -164,7 +203,11 @@ fn name_words(s: &str) -> Vec<String> {
         .to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
         .filter(|w| !w.is_empty() && !FORM.contains(w))
-        .map(String::from)
+        // Ring forms are the sugar: fructofuranose is fructose.
+        .map(|w| match w.strip_suffix("furanose").or_else(|| w.strip_suffix("pyranose")) {
+            Some(stem) if !stem.is_empty() => format!("{stem}se"),
+            _ => w.to_string(),
+        })
         .collect();
     w.sort();
     w.dedup();
@@ -286,9 +329,10 @@ pub fn rank_rhea(tsv: &str, participants: &[Participant], currency: impl Fn(&str
         let score = (found as f32 + 0.6 * alike.len() as f32) / total as f32 + if same_sides { 0.5 } else { 0.0 }
             - 0.25 * extra as f32
             - rank as f32 * 0.001;
-        let mut why = format!("Has {found} of the {} molecules", main.len());
-        for (model, rhea) in &alike {
-            why.push_str(&format!(", and {rhea} (like {model})"));
+        let mut why = format!("Has {} of the {} molecules", found + alike.len(), main.len());
+        if !alike.is_empty() {
+            let pairs: Vec<String> = alike.iter().map(|(model, rhea)| format!("{rhea} like {model}")).collect();
+            why.push_str(&format!(" (by name: {})", pairs.join("; ")));
         }
         if same_sides {
             why.push_str(", on the same sides");
@@ -350,10 +394,38 @@ mod tests {
     }
 
     #[test]
+    fn ec_numbers() {
+        assert_eq!(ec_from_text("2.7.1.11").as_deref(), Some("2.7.1.11"));
+        assert_eq!(ec_from_text(" EC 2.7.1.11 ").as_deref(), Some("2.7.1.11"));
+        assert_eq!(ec_from_text("ec:3.1.1.n2").as_deref(), Some("3.1.1.n2"));
+        assert_eq!(ec_from_text("2.7.1.-"), None);
+        assert_eq!(ec_from_text("hexokinase"), None);
+        assert_eq!(RheaQuery::ByEc(vec!["2.7.1.1".into(), "2.7.1.2".into()]).text(), "ec:2.7.1.1 OR ec:2.7.1.2");
+        let p = |ec: &[&str], exact| Hit {
+            db: Db::Uniprot,
+            id: String::new(),
+            label: String::new(),
+            detail: None,
+            synonyms: Vec::new(),
+            uri: String::new(),
+            exact,
+            score: 0.0,
+            why: None,
+            ec: ec.iter().map(|s| s.to_string()).collect(),
+        };
+        let proteins = [p(&["2.7.1.1"], false), p(&["2.7.1.2"], true), p(&["2.7.1.2", "2.7.1.-"], true)];
+        assert_eq!(ecs_of_proteins(&proteins), ["2.7.1.2"]);
+        assert_eq!(ecs_of_proteins(&proteins[..1]), ["2.7.1.1"]);
+    }
+
+    #[test]
     fn likeness() {
         assert_eq!(word_likeness("keto-D-fructose 6-phosphate", "beta-D-fructose 6-phosphate"), 1.0);
         assert!(word_likeness("keto-D-fructose 6-phosphate", "alpha-D-glucose 1-phosphate") < ALIKE);
+        assert!(word_likeness("D-tagatofuranose 1,6-bisphosphate", "beta-D-fructofuranose 1,6-bisphosphate") < ALIKE);
         assert_eq!(word_likeness("", "x"), 0.0);
+        assert_eq!(word_likeness("beta-D-fructofuranose 6-phosphate", "beta-D-fructose 6-phosphate"), 1.0);
+        assert_eq!(word_likeness("D-glucopyranose", "D-glucose"), 1.0);
     }
 
     #[test]

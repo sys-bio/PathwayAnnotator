@@ -297,3 +297,32 @@ fn accepting_an_entry_from_another_database() {
     }
     assert_eq!(w.to_sbml(), before);
 }
+
+#[test]
+fn the_model_says_which_organism() {
+    let with = |uri: &str| {
+        format!(
+            r##"<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version2/core" level="3" version="2">
+  <model metaid="m" id="m">
+    <annotation>
+      <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:bqbiol="http://biomodels.net/biology-qualifiers/">
+        <rdf:Description rdf:about="#m">
+          <bqbiol:hasTaxon><rdf:Bag><rdf:li rdf:resource="{uri}"/></rdf:Bag></bqbiol:hasTaxon>
+        </rdf:Description>
+      </rdf:RDF>
+    </annotation>
+  </model>
+</sbml>"##
+        )
+    };
+    for uri in [
+        "https://identifiers.org/taxonomy:9606",
+        "http://identifiers.org/taxonomy/9606",
+        "urn:miriam:taxonomy:9606",
+        "http://purl.obolibrary.org/obo/NCBITaxon_9606",
+    ] {
+        assert_eq!(load(&with(uri)).unwrap().model_taxon(), Some(9606), "{uri}");
+    }
+    assert_eq!(load(MODEL).unwrap().model_taxon(), None);
+}

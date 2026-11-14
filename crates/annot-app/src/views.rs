@@ -20,6 +20,7 @@ const EXAMPLE: &str = include_str!("../assets/glycolysis-example.ant");
 enum Tab {
     Molecules,
     Reactions,
+    Compartments,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -54,11 +55,18 @@ struct Ctx {
     /// The reaction to go back to after jumping from one of its molecule
     /// chips to the Molecules list.
     return_to: RwSignal<Option<Element>>,
+    /// Whose proteins UniProt searches cover (an NCBI taxon id), `None`
+    /// for any organism. Starts as the model's organism, if it says.
+    organism: RwSignal<Option<u32>>,
 }
 
 /// Opens an element in its tab and scrolls it into view.
 fn reveal(ctx: Ctx, el: Element) {
-    ctx.tab.set(if matches!(el, Element::Reaction(_)) { Tab::Reactions } else { Tab::Molecules });
+    ctx.tab.set(match el {
+        Element::Reaction(_) => Tab::Reactions,
+        Element::Compartment(_) => Tab::Compartments,
+        _ => Tab::Molecules,
+    });
     ctx.filter.set(Filter::All);
     ctx.selected.set(Some(el));
     set_timeout(
@@ -125,6 +133,7 @@ pub fn App() -> impl IntoView {
         selected: RwSignal::new(None),
         pinned: RwSignal::new(None),
         return_to: RwSignal::new(None),
+        organism: RwSignal::new(None),
     };
     provide_context(ctx);
 
@@ -142,7 +151,10 @@ pub fn App() -> impl IntoView {
         };
         match annot_model::load(&text) {
             Ok(ws) => {
-                ctx.session.set(Some(Session::new(p, ws, name)));
+                ctx.organism.set(ws.model_taxon());
+                let mut session = Session::new(p, ws, name);
+                session.remember_online(browser::remembered_names());
+                ctx.session.set(Some(session));
                 ctx.selected.set(None);
                 ctx.filter.set(Filter::All);
                 ctx.message.set(None);
@@ -377,6 +389,7 @@ fn Tabs() -> impl IntoView {
         <nav class="tabs" role="tablist">
             {tab_button(Tab::Molecules, "Molecules")}
             {tab_button(Tab::Reactions, "Reactions")}
+            {tab_button(Tab::Compartments, "Compartments")}
             <span class="filters">
                 {filter_button(Filter::All, "All")}
                 {filter_button(Filter::Review, "To review")}
@@ -396,7 +409,11 @@ fn ItemList() -> impl IntoView {
         let filter = ctx.filter.get();
         ctx.session.with(|s| {
             let Some(s) = s else { return Vec::new() };
-            let all = if tab == Tab::Molecules { s.species() } else { s.reactions() };
+            let all = match tab {
+                Tab::Molecules => s.species(),
+                Tab::Reactions => s.reactions(),
+                Tab::Compartments => s.compartments(),
+            };
             all.into_iter().filter(|el| filter.keeps(&s.status(*el))).collect::<Vec<_>>()
         })
     };
@@ -448,12 +465,17 @@ fn Item(el: Element) -> impl IntoView {
     let status = move || s.with(|s| s.as_ref().map(|s| s.status(el)).unwrap_or(Status::Unknown));
     let open = move || ctx.selected.get() == Some(el);
     let toggle = move |_| ctx.selected.update(|sel| *sel = if *sel == Some(el) { None } else { Some(el) });
+    // A compartment's suggestion is a GO term from the pack's table of
+    // compartment names, not a pack entry.
+    let compartment = matches!(el, Element::Compartment(_));
     let accept_first = move |ev: web_sys::MouseEvent| {
         ev.stop_propagation();
         s.update(|s| {
-            if let Some(s) = s
-                && let Some(c) = s.candidates(el).first()
-            {
+            let Some(s) = s else { return };
+            if compartment {
+                let msg = s.accept_compartment(el);
+                ctx.message.set(Some(msg));
+            } else if let Some(c) = s.candidates(el).first() {
                 let msg = s.accept(el, c.target);
                 ctx.message.set(Some(msg));
             }
@@ -462,9 +484,11 @@ fn Item(el: Element) -> impl IntoView {
     let reject_first = move |ev: web_sys::MouseEvent| {
         ev.stop_propagation();
         s.update(|s| {
-            if let Some(s) = s
-                && let Some(c) = s.candidates(el).first()
-            {
+            let Some(s) = s else { return };
+            if compartment {
+                let msg = s.reject_compartment(el);
+                ctx.message.set(Some(msg));
+            } else if let Some(c) = s.candidates(el).first() {
                 let msg = s.reject(el, c.target);
                 ctx.message.set(Some(msg));
             }
@@ -473,8 +497,12 @@ fn Item(el: Element) -> impl IntoView {
     // Where to check the suggestion, or the current identification.
     let suggestion_link = move || {
         s.with(|s| {
-            s.as_ref()
-                .and_then(|s| s.candidates(el).first().and_then(|c| s.main_link(c.target)))
+            s.as_ref().and_then(|s| {
+                if compartment {
+                    return s.compartment_suggestion(el).map(|(uri, _)| uri);
+                }
+                s.candidates(el).first().and_then(|c| s.main_link(c.target))
+            })
         })
     };
     let identity_link = move || s.with(|s| s.as_ref().and_then(|s| s.ws.identity_uris(el).into_iter().next()));
@@ -846,6 +874,43 @@ fn RenameId(el: Element) -> impl IntoView {
     }
 }
 
+/// Choosing whose proteins UniProt searches cover. Shared by every search
+/// (it is part of [`Ctx`]); the model's own organism is offered first when
+/// it names one.
+#[component]
+fn OrganismChoice() -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    let model_taxon = ctx.session.with_untracked(|s| s.as_ref().and_then(|s| s.ws.model_taxon()));
+    let mut options: Vec<(u32, String)> = Vec::new();
+    if let Some(t) = model_taxon {
+        let name = annot_online::ORGANISMS.iter().find(|(id, _)| *id == t).map(|(_, n)| n.to_string());
+        options.push((t, format!("{} (the model's)", name.unwrap_or_else(|| format!("taxon {t}")))));
+    }
+    for (id, name) in annot_online::ORGANISMS {
+        if Some(*id) != model_taxon {
+            options.push((*id, name.to_string()));
+        }
+    }
+    view! {
+        <label class="organism">
+            <span class="muted">"Proteins from "</span>
+            <select on:change=move |ev| ctx.organism.set(event_target_value(&ev).parse().ok())>
+                <option value="" selected=move || ctx.organism.get().is_none()>"any organism"</option>
+                {options
+                    .into_iter()
+                    .map(|(id, name)| {
+                        view! {
+                            <option value=id.to_string() selected=move || ctx.organism.get() == Some(id)>
+                                {name}
+                            </option>
+                        }
+                    })
+                    .collect_view()}
+            </select>
+        </label>
+    }
+}
+
 /// How many proteins to show when none has exactly the name searched for.
 const PROTEINS_SHOWN: usize = 3;
 
@@ -874,7 +939,9 @@ fn OnlineSearch(el: Element) -> impl IntoView {
     let ctx = expect_context::<Ctx>();
     let s = ctx.session;
     let reaction = matches!(el, Element::Reaction(_));
+    let compartment = matches!(el, Element::Compartment(_));
     let text = RwSignal::new(s.with_untracked(|s| s.as_ref().map(|s| s.search_text(el)).unwrap_or_default()));
+    let enzyme = RwSignal::new(s.with_untracked(|s| s.as_ref().map(|s| s.enzyme_text(el)).unwrap_or_default()));
     let found = RwSignal::new(None::<Found>);
     // For a reaction: its molecules, and which are identified (the search
     // uses their ChEBI ids, else their names).
@@ -885,10 +952,22 @@ fn OnlineSearch(el: Element) -> impl IntoView {
         if q.is_empty() {
             return;
         }
+        let taxon = ctx.organism.get_untracked();
         found.set(Some(Found::Searching));
         spawn_local(async move {
             let mut hits = Vec::new();
             let mut problems = Vec::new();
+            if compartment {
+                match browser::fetch_text(&annot_online::go_url(&q)).await.and_then(|j| annot_online::parse_go(&j, &q)) {
+                    Ok(mut h) => {
+                        annot_online::exact_first(&mut h);
+                        hits.extend(h);
+                    }
+                    Err(e) => problems.push(format!("GO: {e}")),
+                }
+                found.set(Some(Found::Done { hits, problems, note: None }));
+                return;
+            }
             match browser::fetch_text(&annot_online::chebi_url(&q)).await.and_then(|j| annot_online::parse_chebi(&j, &q)) {
                 Ok(mut h) => {
                     annot_online::exact_first(&mut h);
@@ -897,7 +976,7 @@ fn OnlineSearch(el: Element) -> impl IntoView {
                 Err(e) => problems.push(format!("ChEBI: {e}")),
             }
             let mut note = None;
-            match browser::fetch_text(&annot_online::uniprot_url(&q, None))
+            match browser::fetch_text(&annot_online::uniprot_url(&q, taxon))
                 .await
                 .and_then(|t| annot_online::parse_uniprot(&t, &q))
             {
@@ -967,6 +1046,58 @@ fn OnlineSearch(el: Element) -> impl IntoView {
         });
     };
     let search = move || if reaction { search_reaction() } else { search_molecule() };
+    // A reaction by its enzyme: an EC number goes straight to Rhea; a name
+    // is looked up in UniProt for its EC numbers first.
+    let search_enzyme = move || {
+        let q = enzyme.get_untracked().trim().to_string();
+        if q.is_empty() {
+            return;
+        }
+        let parts = parts();
+        let taxon = ctx.organism.get_untracked();
+        found.set(Some(Found::Searching));
+        spawn_local(async move {
+            let done = |hits, problems: Vec<String>, note: Option<String>| {
+                found.set(Some(Found::Done { hits, problems, note }));
+            };
+            let (ecs, from) = match annot_online::ec_from_text(&q) {
+                Some(ec) => (vec![ec], None),
+                None => {
+                    let proteins = browser::fetch_text(&annot_online::uniprot_ec_url(&q, taxon))
+                        .await
+                        .and_then(|t| annot_online::parse_uniprot(&t, &q));
+                    match proteins {
+                        Ok(p) => (annot_online::ecs_of_proteins(&p), Some(q.clone())),
+                        Err(e) => return done(Vec::new(), vec![format!("UniProt: {e}")], None),
+                    }
+                }
+            };
+            if ecs.is_empty() {
+                let note = format!(
+                    "No reviewed protein named \"{q}\" has an EC number{}. Try another name, or an EC number.",
+                    if taxon.is_some() { " in this organism" } else { "" }
+                );
+                return done(Vec::new(), Vec::new(), Some(note));
+            }
+            let query = RheaQuery::ByEc(ecs.clone());
+            let result = browser::fetch_text(&annot_online::rhea_url(&query)).await.and_then(|tsv| {
+                s.with_untracked(|s| match s {
+                    Some(s) => annot_online::rank_rhea(&tsv, &parts, |id| s.chebi_is_currency(id)),
+                    None => Ok(Vec::new()),
+                })
+            });
+            let ecs = ecs.join(", ");
+            let note = match from {
+                Some(name) => format!("Rhea reactions of EC {ecs}, the activity of proteins named \"{name}\" in UniProt."),
+                None => format!("Rhea reactions of EC {ecs}."),
+            };
+            match result {
+                Ok(hits) => done(hits, Vec::new(), Some(note)),
+                Err(e) => done(Vec::new(), vec![format!("Rhea: {e}")], None),
+            }
+        });
+    };
+    let organism_choice = move || view! { <OrganismChoice/> };
 
     let form = move || {
         if reaction {
@@ -997,6 +1128,52 @@ fn OnlineSearch(el: Element) -> impl IntoView {
                     <button class="primary" on:click=move |_| search()>"Search Rhea"</button>
                 </div>
                 <p class="hint">{how} " Sends their ChEBI ids or names to " {Db::Rhea.host()} "."</p>
+                <div class="online-form">
+                    <label>
+                        <span class="muted">"Or by enzyme name or EC number "</span>
+                        <input
+                            type="text"
+                            placeholder="phosphofructokinase, or 2.7.1.11"
+                            prop:value=move || enzyme.get()
+                            on:input=move |ev| enzyme.set(event_target_value(&ev))
+                            on:keydown=move |ev: web_sys::KeyboardEvent| {
+                                if ev.key() == "Enter" {
+                                    search_enzyme();
+                                }
+                            }
+                        />
+                    </label>
+                    {organism_choice}
+                    <button on:click=move |_| search_enzyme()>"Search by enzyme"</button>
+                </div>
+                <p class="hint">
+                    "A name is looked up in UniProt for the enzyme's EC numbers, then Rhea lists the reactions of those numbers. "
+                    "Sends the text to " {Db::Uniprot.host()} " and " {Db::Rhea.host()} "."
+                </p>
+            }
+                .into_any()
+        } else if compartment {
+            view! {
+                <div class="online-form">
+                    <label>
+                        <span class="muted">"Search GO for "</span>
+                        <input
+                            type="text"
+                            prop:value=move || text.get()
+                            on:input=move |ev| text.set(event_target_value(&ev))
+                            on:keydown=move |ev: web_sys::KeyboardEvent| {
+                                if ev.key() == "Enter" {
+                                    search();
+                                }
+                            }
+                        />
+                    </label>
+                    <button class="primary" on:click=move |_| search()>"Search GO"</button>
+                </div>
+                <p class="hint">
+                    "The Gene Ontology's cellular components: compartments and structures of the cell. "
+                    "Sends the text to " {Db::Go.host()} "."
+                </p>
             }
                 .into_any()
         } else {
@@ -1015,6 +1192,7 @@ fn OnlineSearch(el: Element) -> impl IntoView {
                             }
                         />
                     </label>
+                    {organism_choice}
                     <button class="primary" on:click=move |_| search()>"Search ChEBI and UniProt"</button>
                 </div>
                 <p class="hint">
@@ -1043,6 +1221,7 @@ fn OnlineSearch(el: Element) -> impl IntoView {
                         Db::Chebi => "ChEBI: molecules",
                         Db::Uniprot => "UniProt: proteins",
                         Db::Rhea => "Rhea: reactions",
+                        Db::Go => "GO: cellular components",
                     };
                     view! { <h5>{what}</h5> }
                 });
@@ -1066,6 +1245,9 @@ fn OnlineSearch(el: Element) -> impl IntoView {
                                 s.update(|s| {
                                     if let Some(s) = s {
                                         let msg = s.accept_online(el, &h);
+                                        if let Some((name, label)) = s.online_entry(&h.uri) {
+                                            browser::remember_name(&h.uri, &name, &label);
+                                        }
                                         ctx.message.set(Some(msg));
                                     }
                                 })
@@ -1163,6 +1345,7 @@ fn Details(el: Element) -> impl IntoView {
                     }}
                 </ul>
             </Show>
+            <Show when=move || !matches!(el, Element::Compartment(_))>
             <h4>"Suggestions"</h4>
             {move || {
                 let rows = rows();
@@ -1252,6 +1435,7 @@ fn Details(el: Element) -> impl IntoView {
                     .collect_view()
                     .into_any()
             }}
+            </Show>
             <OnlineSearch el=el/>
             {move || {
                 let rejected = s.with(|s| s.as_ref().map(|s| s.rejected(el)).unwrap_or_default());

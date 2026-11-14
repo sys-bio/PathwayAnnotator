@@ -7,6 +7,8 @@
 //!   ([`chebi_url`], [`parse_chebi`]), and reviewed UniProt proteins, for
 //!   species that are enzymes or other proteins ([`uniprot_url`],
 //!   [`parse_uniprot`]);
+//! - compartments: the Gene Ontology's cellular components, through OLS
+//!   ([`go_url`], [`parse_go`]);
 //! - reactions: Rhea, by the ChEBI ids of the reaction's molecules where
 //!   they are known, else by their names ([`rhea_url`], [`parse_rhea`]),
 //!   ranked by how well each Rhea reaction fits ([`rank_rhea`]).
@@ -19,10 +21,10 @@ mod rhea;
 mod text;
 mod uniprot;
 
-pub use chebi::{chebi_url, parse_chebi};
-pub use rhea::{Participant, RheaQuery, merge_ranked, parse_rhea, rank_rhea, rhea_url};
+pub use chebi::{chebi_url, go_url, parse_chebi, parse_go};
+pub use rhea::{Participant, RheaQuery, ec_from_text, ecs_of_proteins, merge_ranked, parse_rhea, rank_rhea, rhea_url};
 pub use text::{percent_encode, query_from_id};
-pub use uniprot::{parse_uniprot, uniprot_url};
+pub use uniprot::{ORGANISMS, parse_uniprot, uniprot_ec_url, uniprot_url};
 
 /// The databases searched.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -30,6 +32,8 @@ pub enum Db {
     Chebi,
     Uniprot,
     Rhea,
+    /// The Gene Ontology's cellular components: compartments.
+    Go,
 }
 
 impl Db {
@@ -39,16 +43,18 @@ impl Db {
             Db::Chebi => "ChEBI",
             Db::Uniprot => "UniProt",
             Db::Rhea => "Rhea",
+            Db::Go => "GO",
         }
     }
 
     /// The SBO term for what an entry of this database is: simple chemical,
-    /// polypeptide chain, biochemical reaction.
+    /// polypeptide chain, biochemical reaction, physical compartment.
     pub fn sbo(self) -> u32 {
         match self {
             Db::Chebi => 247,
             Db::Uniprot => 252,
             Db::Rhea => 176,
+            Db::Go => 290,
         }
     }
 
@@ -56,7 +62,7 @@ impl Db {
     /// search.
     pub fn host(self) -> &'static str {
         match self {
-            Db::Chebi => "EBI (www.ebi.ac.uk)",
+            Db::Chebi | Db::Go => "EBI (www.ebi.ac.uk)",
             Db::Uniprot => "UniProt (rest.uniprot.org)",
             Db::Rhea => "Rhea (www.rhea-db.org)",
         }
@@ -81,6 +87,8 @@ pub struct Hit {
     pub score: f32,
     /// Why it ranks where it does, in words ("matches all 3 molecules").
     pub why: Option<String>,
+    /// EC numbers ("2.7.1.11"): of a protein's activity, or a reaction's.
+    pub ec: Vec<String>,
 }
 
 /// Puts exact name matches first, keeping each database's own order

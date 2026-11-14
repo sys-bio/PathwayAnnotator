@@ -1,4 +1,4 @@
-//! ChEBI, searched through EBI's Ontology Lookup Service (OLS4).
+//! ChEBI and GO, searched through EBI's Ontology Lookup Service (OLS4).
 
 use serde::Deserialize;
 
@@ -40,13 +40,34 @@ struct Doc {
     description: Vec<String>,
 }
 
+/// The OLS search for `text` among GO's cellular components (the terms
+/// under GO:0005575, "cellular_component").
+pub fn go_url(text: &str) -> String {
+    format!(
+        "https://www.ebi.ac.uk/ols4/api/search?q={}&ontology=go&rows={ROWS}\
+         &fieldList=obo_id,label,exact_synonyms,related_synonyms,description&queryFields=label,synonym\
+         &allChildrenOf=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FGO_0005575",
+        percent_encode(text.trim())
+    )
+}
+
 /// The ChEBI entries in an OLS answer, in OLS's order of relevance, with
 /// exact name matches marked. Entries without a ChEBI id are skipped.
 pub fn parse_chebi(json: &str, query: &str) -> Result<Vec<Hit>, String> {
-    let answer: Answer = serde_json::from_str(json).map_err(|e| format!("ChEBI search answer: {e}"))?;
+    parse_ols(json, query, Db::Chebi, "CHEBI:")
+}
+
+/// The GO terms in an OLS answer ([`go_url`]), as [`parse_chebi`] does.
+pub fn parse_go(json: &str, query: &str) -> Result<Vec<Hit>, String> {
+    parse_ols(json, query, Db::Go, "GO:")
+}
+
+fn parse_ols(json: &str, query: &str, db: Db, prefix: &str) -> Result<Vec<Hit>, String> {
+    let answer: Answer =
+        serde_json::from_str(json).map_err(|e| format!("{} search answer: {e}", db.label()))?;
     let mut hits = Vec::new();
     for (rank, d) in answer.response.docs.into_iter().enumerate() {
-        let Some(id) = d.obo_id.filter(|i| i.starts_with("CHEBI:")) else {
+        let Some(id) = d.obo_id.filter(|i| i.starts_with(prefix)) else {
             continue;
         };
         let label = strip_html(d.label.as_deref().unwrap_or(&id));
@@ -58,7 +79,7 @@ pub fn parse_chebi(json: &str, query: &str) -> Result<Vec<Hit>, String> {
         }
         let exact = names_match(query, &label, &synonyms);
         hits.push(Hit {
-            db: Db::Chebi,
+            db,
             uri: format!("https://identifiers.org/{id}"),
             id,
             label,
@@ -67,6 +88,7 @@ pub fn parse_chebi(json: &str, query: &str) -> Result<Vec<Hit>, String> {
             exact,
             score: -(rank as f32),
             why: exact.then(|| "Its name or a synonym is the search text".to_string()),
+            ec: Vec::new(),
         });
     }
     Ok(hits)

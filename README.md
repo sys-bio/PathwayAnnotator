@@ -91,6 +91,7 @@ header.
 When the user asks (Details, "Search other databases"), the app also
 searches [ChEBI](https://www.ebi.ac.uk/chebi) through EBI's
 [Ontology Lookup Service](https://www.ebi.ac.uk/ols4),
-[UniProt](https://www.uniprot.org) and [Rhea](https://www.rhea-db.org)
-(all CC BY 4.0). The search text is sent to those services; nothing is
+[UniProt](https://www.uniprot.org), [Rhea](https://www.rhea-db.org)
+(all CC BY 4.0) and the [Gene Ontology](https://geneontology.org)
+(CC BY 4.0). The search text is sent to those services; nothing is
 sent otherwise.

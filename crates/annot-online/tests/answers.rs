@@ -103,7 +103,22 @@ fn a_molecule_identified_in_another_form_is_recognized_by_name() {
     let hits = rank_rhea(rows, &parts, |_| false).unwrap();
     assert_eq!(hits[0].id, "RHEA:11816");
     let why = hits[0].why.as_deref().unwrap();
-    assert!(why.contains("beta-D-fructose 6-phosphate (like keto-D-fructose 6-phosphate)"), "{why}");
+    assert_eq!(
+        why,
+        "Has 2 of the 2 molecules (by name: beta-D-fructose 6-phosphate like keto-D-fructose 6-phosphate), on the same sides"
+    );
     assert!(why.contains("same sides") && !why.contains("other molecule"), "{why}");
     assert!(hits[1].why.as_deref().unwrap().contains("1 other molecule"));
+}
+
+#[test]
+fn go_cellular_components() {
+    let mut hits = annot_online::parse_go(include_str!("fixtures/ols-go-mitochondria.json"), "mitochondria").unwrap();
+    assert!(hits.iter().all(|h| h.db == Db::Go && h.id.starts_with("GO:")));
+    exact_first(&mut hits);
+    // "mitochondria" is a synonym of mitochondrion.
+    assert_eq!(hits[0].id, "GO:0005739");
+    assert!(hits[0].exact);
+    assert_eq!(hits[0].uri, "https://identifiers.org/GO:0005739");
+    assert_eq!(Db::Go.sbo(), 290);
 }

@@ -72,6 +72,12 @@ pub struct Session {
     /// (each one reads the element's annotation XML).
     species_status: Vec<Status>,
     reaction_status: Vec<Status>,
+    compartment_status: Vec<Status>,
+    /// The GO term suggested for each compartment, from the pack's table
+    /// of compartment names: (URI, label).
+    compartment_go: Vec<Option<(String, String)>>,
+    /// Compartments whose suggestion the user rejected (this session).
+    rejected_compartments: Vec<Element>,
     /// Suggestions the user rejected, per element. Kept for the session
     /// only: they are not written into the model.
     rejected: BTreeMap<Element, Vec<Target>>,
@@ -94,6 +100,9 @@ impl Session {
             file_name,
             species_status: Vec::new(),
             reaction_status: Vec::new(),
+            compartment_status: Vec::new(),
+            compartment_go: Vec::new(),
+            rejected_compartments: Vec::new(),
             rejected: BTreeMap::new(),
             online_labels: BTreeMap::new(),
             online_names: BTreeMap::new(),
@@ -155,6 +164,8 @@ impl Session {
         }
         self.suggestions = annotate(&self.pack, &self.model);
         self.species_status = self.species().into_iter().map(|el| self.compute_status(el)).collect();
+        self.compartment_go = (0..self.model.compartments.len()).map(|i| self.match_compartment(i)).collect();
+        self.compartment_status = self.compartments().into_iter().map(|el| self.compartment_status_of(el)).collect();
         self.reaction_status = self.reactions().into_iter().map(|el| self.compute_status(el)).collect();
     }
 
@@ -228,6 +239,7 @@ impl Session {
         match el {
             Element::Species(i) => self.species_status.get(i).cloned().unwrap_or(Status::Unknown),
             Element::Reaction(i) => self.reaction_status.get(i).cloned().unwrap_or(Status::Unknown),
+            Element::Compartment(i) => self.compartment_status.get(i).cloned().unwrap_or(Status::Unknown),
             _ => Status::Unknown,
         }
     }
@@ -271,8 +283,118 @@ impl Session {
                 let r = &self.model.reactions[i];
                 r.name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| r.id.clone())
             }
+            Element::Compartment(i) => {
+                let c = &self.model.compartments[i];
+                c.name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| c.id.clone())
+            }
             _ => String::new(),
         }
+    }
+
+    pub fn compartments(&self) -> Vec<Element> {
+        (0..self.model.compartments.len()).map(Element::Compartment).collect()
+    }
+
+    /// The GO term for a compartment from the pack's table of compartment
+    /// names (BiGG's codes, labels and the names modelers use), with how
+    /// sure the match is: its code or label is likely; another name
+    /// ("cytoplasm" for cytosol, which GO keeps apart) is uncertain.
+    fn match_compartment(&self, i: usize) -> Option<(String, String)> {
+        self.compartment_match(i).map(|(uri, label, _)| (uri, label))
+    }
+
+    fn compartment_match(&self, i: usize) -> Option<(String, String, Confidence)> {
+        let c = &self.model.compartments[i];
+        let words: Vec<String> = [Some(c.id.clone()), c.name.clone()]
+            .into_iter()
+            .flatten()
+            .map(|w| kpack::normalize_name(&w))
+            .filter(|w| !w.is_empty())
+            .collect();
+        let mut best: Option<(String, String, Confidence)> = None;
+        for def in &self.pack.compartments {
+            let Some(go) = def.go else { continue };
+            let label = self.pack.str(def.label);
+            let main = [self.pack.str(def.code), label].map(kpack::normalize_name);
+            let other: Vec<String> = def.synonyms.iter().map(|s| kpack::normalize_name(self.pack.str(*s))).collect();
+            let level = if words.iter().any(|w| main.contains(w)) {
+                Confidence::Likely
+            } else if words.iter().any(|w| other.contains(w)) {
+                Confidence::Uncertain
+            } else {
+                continue;
+            };
+            let better = best.as_ref().is_none_or(|b| level == Confidence::Likely && b.2 != Confidence::Likely);
+            if better {
+                best = Some((format!("https://identifiers.org/{}", self.pack.str(go)), label.to_string(), level));
+            }
+        }
+        best
+    }
+
+    fn compartment_status_of(&self, el: Element) -> Status {
+        let Element::Compartment(i) = el else { return Status::Unknown };
+        let uris = self.ws.identity_uris(el);
+        let go = uris.iter().find(|u| u.contains("GO:") || u.contains("GO%3A"));
+        if let Some(go) = go {
+            let id = go.rsplit(['/', ':']).next().unwrap_or_default();
+            let label = self
+                .pack
+                .compartments
+                .iter()
+                .find(|d| d.go.is_some_and(|g| self.pack.str(g).ends_with(id)))
+                .map(|d| format!("{} (GO:{id})", self.pack.str(d.label)))
+                .or_else(|| self.online_labels.get(go).cloned())
+                .unwrap_or_else(|| format!("GO:{id}"));
+            return Status::Identified { label };
+        }
+        if !uris.is_empty() {
+            return Status::AnnotatedElsewhere { label: uris.iter().find_map(|u| self.online_labels.get(u).cloned()) };
+        }
+        if self.rejected_compartments.contains(&el) {
+            return Status::Unknown;
+        }
+        match self.compartment_match(i) {
+            Some((uri, label, level)) => {
+                let id = uri.rsplit('/').next().unwrap_or_default().to_string();
+                Status::Suggested { label: format!("{label} ({id})"), level }
+            }
+            None => Status::Unknown,
+        }
+    }
+
+    /// The GO term suggested for a compartment: (URI, label).
+    pub fn compartment_suggestion(&self, el: Element) -> Option<(String, String)> {
+        match el {
+            Element::Compartment(i) if !self.rejected_compartments.contains(&el) => {
+                self.compartment_go.get(i).cloned().flatten()
+            }
+            _ => None,
+        }
+    }
+
+    /// Accepts a compartment's GO suggestion. Returns a message for the user.
+    pub fn accept_compartment(&mut self, el: Element) -> String {
+        let name = self.display_name(el);
+        let Some((uri, label)) = self.compartment_suggestion(el) else {
+            return format!("There is nothing to accept for {name}.");
+        };
+        let msg = match self.ws.accept_uri(el, &uri, Some(annot_online::Db::Go.sbo())) {
+            Ok(()) => format!("{name} identified as {label}."),
+            Err(e) => format!("Could not annotate {name}: {e}."),
+        };
+        self.refresh();
+        msg
+    }
+
+    /// Rejects a compartment's GO suggestion for this session.
+    pub fn reject_compartment(&mut self, el: Element) -> String {
+        let name = self.display_name(el);
+        if !self.rejected_compartments.contains(&el) {
+            self.rejected_compartments.push(el);
+        }
+        self.refresh();
+        format!("The suggestion for {name} is set aside; search GO in Details for another.")
     }
 
     pub fn species(&self) -> Vec<Element> {
@@ -462,10 +584,44 @@ impl Session {
         let name = match el {
             Element::Species(i) => self.model.species[i].name.clone(),
             Element::Reaction(i) => self.model.reactions[i].name.clone(),
+            Element::Compartment(i) => self.model.compartments[i].name.clone(),
             _ => None,
         };
         name.filter(|n| !n.trim().is_empty())
             .unwrap_or_else(|| annot_online::query_from_id(self.ws.element_id(el)))
+    }
+
+    /// What to search Rhea's enzymes with for a reaction: an EC number it
+    /// is annotated with, else its name (not its id: "vPFK" finds nothing
+    /// useful). Empty when there is neither.
+    pub fn enzyme_text(&self, reaction: Element) -> String {
+        let ec = self.ws.identity_uris(reaction).iter().find_map(|u| {
+            let (_, id) = kpack::split_resource(u)?;
+            annot_online::ec_from_text(&id)
+        });
+        if let Some(ec) = ec {
+            return ec;
+        }
+        match reaction {
+            Element::Reaction(i) => self.model.reactions[i].name.clone().unwrap_or_default(),
+            _ => String::new(),
+        }
+    }
+
+    /// Names of entries accepted from other databases earlier (kept in
+    /// the browser): (URI, plain name, name with database and id).
+    pub fn remember_online(&mut self, entries: Vec<(String, String, String)>) {
+        for (uri, name, label) in entries {
+            self.online_names.insert(uri.clone(), name);
+            self.online_labels.insert(uri, label);
+        }
+        self.refresh();
+    }
+
+    /// The plain name and the full label of an entry accepted from another
+    /// database, for remembering it.
+    pub fn online_entry(&self, uri: &str) -> Option<(String, String)> {
+        Some((self.online_names.get(uri)?.clone(), self.online_labels.get(uri)?.clone()))
     }
 
     /// A species' ChEBI ids, every charge form, if it is identified (in
@@ -513,7 +669,9 @@ impl Session {
                 let sp = Element::Species(p.species);
                 annot_online::Participant {
                     name: self.search_text(sp),
-                    label: self.identified_name(sp),
+                    label: self.identified_name(sp).or_else(|| {
+                        self.candidates(sp).first().map(|c| self.label(c.target))
+                    }),
                     chebi: self.chebi_ids(sp),
                     product: p.role == Role::Product,
                     currency: self.is_currency(sp),

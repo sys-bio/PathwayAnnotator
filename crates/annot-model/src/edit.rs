@@ -90,6 +90,26 @@ impl Workspace {
             .collect()
     }
 
+    /// The organism the model is about: the NCBI taxonomy id of its
+    /// `bqbiol:hasTaxon` term ("https://identifiers.org/taxonomy:9606",
+    /// "urn:miriam:taxonomy:9606", ".../taxonomy/9606", ".../NCBITaxon_9606"),
+    /// if it has one.
+    pub fn model_taxon(&self) -> Option<u32> {
+        self.terms(Element::Model)
+            .into_iter()
+            .filter(|t| !t.model && t.qualifier == "hasTaxon")
+            .find_map(|t| {
+                let lower = t.uri.to_ascii_lowercase();
+                let at = ["taxonomy", "ncbitaxon"].iter().find_map(|w| lower.find(w).map(|i| i + w.len()))?;
+                let digits: String = t.uri[at..]
+                    .trim_start_matches([':', '_', '/'])
+                    .chars()
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect();
+                digits.parse().ok()
+            })
+    }
+
     /// What an element is already annotated as, in the pack.
     pub fn resolution(&self, pack: &Pack, el: Element) -> Resolution {
         resolve(pack, &self.identity_uris(el), matches!(el, Element::Reaction(_)))

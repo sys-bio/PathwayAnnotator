@@ -41,6 +41,44 @@ pub async fn fetch_text(url: &str) -> Result<String, String> {
     text.as_string().ok_or_else(|| "the answer is not text".into())
 }
 
+/// Where the names of entries accepted from other databases are kept, in
+/// this browser only.
+const NAMES_KEY: &str = "pathwayannotator.online-names";
+
+fn local_storage() -> Option<web_sys::Storage> {
+    web_sys::window()?.local_storage().ok().flatten()
+}
+
+/// Names of entries accepted from other databases in earlier sessions:
+/// (URI, plain name, name with database and id). Empty if the browser
+/// keeps nothing (private window, storage blocked).
+pub fn remembered_names() -> Vec<(String, String, String)> {
+    let Some(text) = local_storage().and_then(|s| s.get_item(NAMES_KEY).ok().flatten()) else {
+        return Vec::new();
+    };
+    let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return Vec::new();
+    };
+    map.into_iter()
+        .filter_map(|(uri, v)| {
+            let a = v.as_array()?;
+            Some((uri, a.first()?.as_str()?.to_string(), a.get(1)?.as_str()?.to_string()))
+        })
+        .collect()
+}
+
+/// Keeps the name of an accepted entry for later sessions. Failing to
+/// keep it (storage blocked or full) only means it is not remembered.
+pub fn remember_name(uri: &str, name: &str, label: &str) {
+    let Some(store) = local_storage() else { return };
+    let mut map = match store.get_item(NAMES_KEY).ok().flatten().map(|t| serde_json::from_str(&t)) {
+        Some(Ok(serde_json::Value::Object(m))) => m,
+        _ => serde_json::Map::new(),
+    };
+    map.insert(uri.to_string(), serde_json::json!([name, label]));
+    let _ = store.set_item(NAMES_KEY, &serde_json::Value::Object(map).to_string());
+}
+
 /// The text of a file the user chose or dropped.
 pub async fn read_file(file: &web_sys::File) -> Result<String, String> {
     let text = JsFuture::from(file.text()).await.map_err(js_error)?;

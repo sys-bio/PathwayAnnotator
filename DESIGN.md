@@ -718,10 +718,43 @@ Tests read saved answers (`crates/annot-online/tests/fixtures`, fetched
 "fructose 6-phosphate" and accepted from ChEBI; vPGI (G6P -> X2) then
 finds glucose-6-phosphate isomerase, RHEA:11816, first.
 
-Not yet: an organism filter for UniProt (from the model's taxon); a
-second Rhea pass by EC number or enzyme name; remembering names of
-entries accepted from other databases across reloads; GO for
-compartments.
+Follow-ups (2026-11-14, later):
+
+- Organism: searches of UniProt can be limited to one organism and its
+  strains (`taxonomy_id`), chosen from a short list of model organisms;
+  it starts as the model's own (`bqbiol:hasTaxon` on the model, read by
+  `Workspace::model_taxon` in identifiers.org, URN and OBO forms) and is
+  shared by every search in the session.
+- Enzyme search for reactions: "Or by enzyme name or EC number"
+  (prefilled with an EC number the reaction is annotated with, else its
+  name). An EC number goes to Rhea directly; a name is looked up in
+  reviewed UniProt first and the most common complete EC numbers of the
+  proteins with exactly that name (else of all found; at most three)
+  are searched in Rhea (`ec:a OR ec:b`). The results are ranked as
+  before; the note says which EC numbers were used and where they came
+  from.
+- Name likeness now also uses the annotator's suggestion for molecules
+  that are not identified, and reads ring forms as the sugar
+  ("fructofuranose" is fructose); the threshold is 0.7, so names that
+  differ only in the sugar do not match. On the glycolysis example, vPFK
+  searched by "phosphofructokinase" ranks PFK-1 (RHEA:16109) first:
+  "Has 2 of the 2 molecules (by name: ...), on the same sides".
+- Names of entries accepted from other databases are kept in the
+  browser's local storage (`pathwayannotator.online-names`: URI -> name,
+  label) and read when a model is opened, so a reloaded model still says
+  "Identified as keto-D-fructose 6-phosphate (ChEBI CHEBI:15946)". Only
+  public database names are kept; if storage is blocked nothing is
+  remembered and nothing breaks.
+- Compartments: a Compartments tab. Each compartment gets a GO term from
+  the pack's table of compartment names (BiGG codes, labels and common
+  names): likely when its id or name is the code or label, uncertain when
+  it is another name (BiGG treats "cytoplasm" as cytosol; GO does not).
+  Accept writes the GO URI and SBO:0000290 (physical compartment);
+  Reject sets it aside for the session. Details searches GO's cellular
+  components through OLS (`allChildrenOf` GO:0005575) and has Rename.
+
+Still not done: Rhea by enzyme for proteins not in UniProt's reviewed
+set; remembering choices across browsers (local storage is per browser).
 
 ## 6. Benchmark (`annot-cli bench`)
 
