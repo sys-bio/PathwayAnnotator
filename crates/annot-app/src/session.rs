@@ -100,6 +100,9 @@ impl Session {
     /// database reaction exactly becomes high confidence). Rejected
     /// suggestions are passed on so they never come back.
     fn refresh(&mut self) {
+        // Rebuilt from the document every time: a rename (or undoing one)
+        // changes ids the engine sees.
+        self.model = self.ws.engine_model();
         for i in 0..self.model.species.len() {
             let el = Element::Species(i);
             let known = match self.ws.resolution(&self.pack, el) {
@@ -413,6 +416,20 @@ impl Session {
     }
 
     /// Accepts every high-confidence suggestion. Returns how many.
+    /// Renames an element's SBML id, updating every reference to it.
+    /// Returns a message for the user, or why it could not be done.
+    pub fn rename(&mut self, el: Element, new_id: &str) -> Result<String, String> {
+        let old = self.ws.element_id(el).to_string();
+        let n = self.ws.rename(el, new_id).map_err(|e| e.to_string())?;
+        self.refresh();
+        let refs = n.saturating_sub(1);
+        Ok(format!(
+            "Renamed {old} to {}, and updated {refs} reference{} to it. Undo reverts the whole rename.",
+            new_id.trim(),
+            if refs == 1 { "" } else { "s" }
+        ))
+    }
+
     pub fn accept_all_high(&mut self) -> usize {
         let mut n = 0;
         for el in self.species().into_iter().chain(self.reactions()) {

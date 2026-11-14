@@ -699,6 +699,95 @@ fn Chip(reaction: Element, position: usize, species: Element, label: String, cla
     }
 }
 
+/// An element's SBML id, and renaming it: every reference in the model
+/// follows (reactions, rate laws, rules, events, layouts), as one undoable
+/// step, or nothing changes and the reason is shown.
+#[component]
+fn RenameId(el: Element) -> impl IntoView {
+    let ctx = expect_context::<Ctx>();
+    let s = ctx.session;
+    let editing = RwSignal::new(false);
+    let draft = RwSignal::new(String::new());
+    let error = RwSignal::new(None::<String>);
+    let current = move || s.with(|s| s.as_ref().map(|s| s.ws.element_id(el).to_string()).unwrap_or_default());
+    let start = move |_| {
+        draft.set(current());
+        error.set(None);
+        editing.set(true);
+    };
+    let cancel = move || {
+        editing.set(false);
+        error.set(None);
+    };
+    let commit = move || {
+        let new_id = draft.get_untracked();
+        let mut result = None;
+        s.update(|s| {
+            if let Some(s) = s {
+                result = Some(s.rename(el, &new_id));
+            }
+        });
+        match result {
+            Some(Ok(msg)) => {
+                editing.set(false);
+                error.set(None);
+                ctx.message.set(Some(msg));
+            }
+            Some(Err(e)) => error.set(Some(e)),
+            None => {}
+        }
+    };
+    let input_id = format!("rename-{}", dom_id(el));
+    // Focus the field, with its text selected, when it opens: the user
+    // types the new id straight away. (The autofocus attribute only works
+    // for elements present when the page loads.)
+    let input_ref: NodeRef<leptos::html::Input> = NodeRef::new();
+    Effect::new(move |_| {
+        if editing.get()
+            && let Some(input) = input_ref.get()
+        {
+            let _ = input.focus();
+            input.select();
+        }
+    });
+    view! {
+        <div class="rename">
+            <Show
+                when=move || editing.get()
+                fallback=move || {
+                    view! {
+                        <span class="muted">"SBML id: "</span>
+                        <code>{current}</code>
+                        <button class="link" on:click=start>"Rename"</button>
+                    }
+                }
+            >
+                <label for=input_id.clone()>"New SBML id"</label>
+                <input
+                    node_ref=input_ref
+                    id=input_id.clone()
+                    type="text"
+                    spellcheck="false"
+                    autocomplete="off"
+                    prop:value=move || draft.get()
+                    on:input=move |ev| draft.set(event_target_value(&ev))
+                    on:keydown=move |ev: web_sys::KeyboardEvent| match ev.key().as_str() {
+                        "Enter" => commit(),
+                        "Escape" => cancel(),
+                        _ => {}
+                    }
+                />
+                <button class="primary" on:click=move |_| commit()>"Rename"</button>
+                <button on:click=move |_| cancel()>"Cancel"</button>
+                <p class="hint">
+                    "Every reference to it in the model is updated too: reactions, rate laws, rules, events and layout."
+                </p>
+                {move || error.get().map(|e| view! { <p class="error" role="alert">{e}</p> })}
+            </Show>
+        </div>
+    }
+}
+
 /// The candidates for an element, with their evidence, and its existing
 /// annotation.
 #[component]
@@ -729,6 +818,7 @@ fn Details(el: Element) -> impl IntoView {
     let existing = move || s.with(|s| s.as_ref().map(|s| s.ws.terms(el)).unwrap_or_default());
     view! {
         <div class="details">
+            <RenameId el=el/>
             <Show when=move || !existing().is_empty()>
                 <h4>"Current annotation"</h4>
                 <ul class="terms">

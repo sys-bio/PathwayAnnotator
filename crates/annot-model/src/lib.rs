@@ -20,11 +20,13 @@
 //! No I/O; works in WebAssembly.
 
 mod edit;
+mod rename;
 mod resolve;
 mod uris;
 mod view;
 
 pub use edit::{EditError, Term};
+pub use rename::{RenameError, is_valid_id, references_left};
 pub use resolve::{Resolution, resolve};
 pub use uris::{sbo_for, uri, uris_for};
 
@@ -71,12 +73,20 @@ impl fmt::Display for LoadError {
 
 impl std::error::Error for LoadError {}
 
-/// One annotation change, kept for undo.
+/// One change, kept for undo.
 #[derive(Clone, Debug)]
-struct Change {
-    element: Element,
-    before: sbml_io::Meta,
-    after: sbml_io::Meta,
+enum Change {
+    /// An element's annotation, SBO term or other metadata.
+    Meta {
+        element: Element,
+        before: Box<sbml_io::Meta>,
+        after: Box<sbml_io::Meta>,
+    },
+    /// A change reaching all over the document (a rename).
+    Document {
+        before: Box<sbml_io::Document>,
+        after: Box<sbml_io::Document>,
+    },
 }
 
 /// A model being annotated.
@@ -168,7 +178,10 @@ impl Workspace {
         let Some(c) = self.undo.pop() else {
             return false;
         };
-        *self.meta_mut(c.element) = c.before.clone();
+        match &c {
+            Change::Meta { element, before, .. } => *self.meta_mut(*element) = (**before).clone(),
+            Change::Document { before, .. } => self.doc = (**before).clone(),
+        }
         self.redo.push(c);
         true
     }
@@ -178,7 +191,10 @@ impl Workspace {
         let Some(c) = self.redo.pop() else {
             return false;
         };
-        *self.meta_mut(c.element) = c.after.clone();
+        match &c {
+            Change::Meta { element, after, .. } => *self.meta_mut(*element) = (**after).clone(),
+            Change::Document { after, .. } => self.doc = (**after).clone(),
+        }
         self.undo.push(c);
         true
     }

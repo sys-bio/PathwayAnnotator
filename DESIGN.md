@@ -603,20 +603,41 @@ Learning from the user (2026-11-14):
   session, not the SBML; Details lists them with Restore. Buttons in the
   row, on each candidate and in the molecule chip card.
 
+Renaming SBML ids (2026-11-14), `annot_model::Workspace::rename`:
+- Species, reactions and compartments. In the app: Details shows "SBML
+  id: s9 [Rename]"; the field opens focused with the id selected; Enter
+  renames, Escape cancels; a refusal is explained in place.
+- The new id must be a valid SId, different, and unused anywhere in the
+  model (any `id="..."` in the written document, so parameters, unit
+  definitions, layout glyphs and local parameters all count).
+- On a copy of the document, every reference is renamed by walking
+  sbml-io's data: species and modifier references, compartment
+  references, conversion factors, initial assignment symbols, rule and
+  event assignment variables, all MathML (kinetic laws, rules, initial
+  assignments, constraints, stoichiometry math, event triggers, delays,
+  priorities, assignments), and the Layout package (compartment, species,
+  reaction, text, general and reference glyphs). Function definitions are
+  left alone: SBML does not let them refer to model ids, and an argument
+  of the same name shadows the id.
+- Refused when a rate law has a local parameter with the old or new id
+  (ambiguous), and when, after renaming, the written copy still refers to
+  the old id (an attribute other than `name` / `metaid`, or a `<ci>`
+  outside function definitions): those are references in raw XML that
+  sbml-io does not take apart (other packages such as FBC objectives,
+  CellDesigner annotations, raw MathML). Better refused than half done.
+- One undoable step (`Change::Document`, a whole-document before/after).
+  The session rebuilds the engine's view after every edit, undo and redo.
+- Checked on all 1,075 cached curated BioModels (renaming the first
+  species and the first reaction of each): 996 species and 940 reactions
+  renamed, none with a reference left behind, none gaining a validation
+  issue, undo restoring every model exactly; 51 species and 25 reactions
+  refused, all for references in raw XML (mostly CellDesigner
+  annotations: `species="s121"`, `reaction="re44"`, `sbmlid="pgi"`).
+- Not yet: renaming parameters; updating references inside other
+  packages' raw XML (it could be done for well-known ones such as FBC);
+  renaming in Antimony text (an Antimony model is exported as SBML).
+
 Known issues / next (in order):
-- Rename an element's SBML id (requested 2026-11-14), for example giving
-  s9 a meaningful id once it is identified. A bigger job: every reference
-  must follow, or the model breaks. In SBML: speciesReference/@species,
-  modifierSpeciesReference/@species, MathML `<ci>` in kinetic laws, rules,
-  initial assignments, event triggers, delays, priorities and assignments,
-  and constraints (but not where a kinetic law's local parameter of the
-  same name shadows it), rule and event assignment variables,
-  compartment references, conversion factors; the Layout package's glyph
-  references (species and reaction glyphs point at ids); and `metaid`s are
-  separate and stay. The new id must be a valid SId and unique in the
-  model. Undoable as one step. For Antimony-loaded models, the same rename
-  in the Antimony text if Antimony export is added. sbml-io keeps MathML as
-  a tree, so the rename can be a tree walk rather than text replacement.
 - "Accept all" is undone one element at a time; it should be one step.
 - Some BiGG labels are poor ("R_glucose_transport__uniport_", "PGKf");
   prefer a ChEBI/Rhea name or a cleaned label for display.

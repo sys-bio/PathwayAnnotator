@@ -210,10 +210,10 @@ impl Workspace {
             return;
         }
         *self.meta_mut(el) = after.clone();
-        self.undo.push(Change {
+        self.undo.push(Change::Meta {
             element: el,
-            before,
-            after,
+            before: Box::new(before),
+            after: Box::new(after),
         });
         self.redo.clear();
     }
