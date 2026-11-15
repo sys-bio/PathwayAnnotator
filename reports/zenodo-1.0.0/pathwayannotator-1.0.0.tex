@@ -1,0 +1,174 @@
+% PathwayAnnotator 1.0.0: a report for Zenodo.
+% Build: pdflatex, bibtex, pdflatex, pdflatex (main file pathwayannotator-1.0.0.tex).
+\documentclass[10pt]{article}
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\usepackage[numbers,sort&compress]{natbib}
+\setlength{\bibsep}{0pt plus 0.3ex}
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0pt}
+
+\title{\vspace{-1.5em}PathwayAnnotator: A Web-based SBML Annotation Tool for Biochemical Networks}
+% Inside \author there can be no blank lines: use \\ for line breaks.
+\author{Herbert M. Sauro$^{1,2}$\\[1ex]
+  \small $^{1}$Department of Bioengineering, University of Washington, Seattle, WA, 98195-5061, USA\\
+  \small $^{2}$eScience Institute, University of Washington, Seattle, WA, 98195-5061, USA
+}
+\date{\small Version 1.0.0, November 2026}
+
+\begin{document}
+\maketitle
+\vspace{-1em}
+
+\begin{abstract}
+\noindent
+PathwayAnnotator is a web application for annotating SBML and Antimony models. For metabolic models the tool will
+suggest annotations for each species, reaction and compartment and shows the evidence for each suggestion. Other kinds of
+model that include proteins or genes can also be annotated manually. The model
+as a whole can also be annotated with its modelling framework, references, organism, creators and notes.
+Accepted annotations are written into the model as MIRIAM and SBO terms. The application is written in Rust,
+with a user interface built with the Leptos framework, and is compiled to WebAssembly so that it runs entirely
+in the browser; suggestions come from a
+knowledge base, built from BiGG Models, ChEBI and the curated models of BioModels, that is downloaded with
+the page. On 133 held-out curated BioModels models with little overlap with the models used to build the
+knowledge base, the first suggestion matched the curators' annotation for 90.8\% of species and 82.7\% of
+reactions that could be graded. Suggestions the tool labels high confidence were correct in 99.3\% (species)
+and 100\% (reactions) of cases, although these thresholds were chosen on the same test set.
+
+\noindent\textbf{Availability:} \url{https://sys-bio.github.io/PathwayAnnotator/} (application) and
+\url{https://github.com/sys-bio/PathwayAnnotator} (source, MIT or Apache-2.0).
+\end{abstract}
+
+\section{Background}
+Annotations link the elements of a model to entries in external resources, so that a species named
+\texttt{G6P} can be recognised as D-glucose 6-phosphate (ChEBI CHEBI:4170) by people and software. In SBML
+\cite{hucka2003sbml} they are written as MIRIAM qualifier--resource pairs \cite{lenovere2005miriam} and
+Systems Biology Ontology (SBO) terms \cite{courtot2011sbo}. Adding them by hand requires looking up every
+element, and many published models are partly annotated or not annotated at all. Earlier tools such as
+semanticSBML \cite{krause2010semanticsbml} and AMAS \cite{shin2023amas} address the same task. PathwayAnnotator
+was written to combine automated suggestion with review by the modeller in a tool that needs no
+installation and sends no model data to a server.
+
+\section{Design}
+\textbf{Architecture.} The application is written in Rust and compiled to WebAssembly; it is a static web page
+and has no server component. The user interface uses Leptos (\url{https://leptos.dev}), a Rust framework
+for web interfaces, in its client-side mode. Models are read and written with SBML (Levels 2 and 3) and Antimony
+\cite{smith2009antimony} libraries written for the same project. The model never leaves the user's computer.
+
+\textbf{Knowledge base.} A build program combines BiGG Models \cite{king2016bigg} (2,441 metabolites and
+7,322 reactions, with their cross-references), ChEBI \cite{hastings2016chebi} release 257 (names, synonyms,
+charge forms, and \emph{is\_a} relations used for broader and narrower matches), and the names that 1,075
+curated BioModels models \cite{malik2020biomodels} use for annotated elements (a name is kept only when the
+models using it agree on what it denotes). The result is a compressed file of about 2.2~MB. Display labels
+are derived from the source names, preferring the common name of a molecule (3-phospho-D-glycerate) to the
+name of its predominant charged form (3-phosphonato-D-glycerate). The data the published knowledge base is
+built from is kept in the source repository, so that a given version can be rebuilt exactly.
+
+\textbf{Suggestion engine.} Each candidate carries the evidence that produced it. Three sources of evidence
+are combined: (i) exact lookup of element names and identifiers in the name index; (ii) a decoder for
+names that are not found directly, which removes SBML prefixes, compartment words (\texttt{ATP\_mit},
+\texttt{Glucose in}) and charges, and recognises database identifiers embedded in SBML identifiers; and
+(iii) reaction context: a species is supported by knowledge-base reactions whose participants match the
+reactions it takes part in in the model, and a reaction is supported by knowledge-base reactions whose
+participants match its own. The first suggestion for each element is assigned one of three confidence
+levels (high, likely, uncertain) from the kind of evidence, its score, and its lead over the next
+candidate. Elements the user confirms or rejects
+are fed back to the engine, which re-ranks the remaining suggestions; a reaction whose participants have all
+been confirmed and which matches a single knowledge-base reaction becomes high confidence.
+
+\textbf{Review and editing.} For each element the interface shows the suggestion, its confidence level,
+synonyms, links to the database entries, and the evidence. Accepting writes a \texttt{bqbiol:is} term with
+identifiers.org URIs and, where none is present, an SBO term. Users can change qualifiers, add or remove
+terms, set SBO terms, and rename SBML identifiers, with all references (including kinetic laws, rules and
+events) updated. Model-level annotation covers the modelling framework (SBO), references
+(\texttt{bqmodel:isDescribedBy}), organism, creators, dates and notes. Every change can be undone.
+
+\textbf{Optional online searches.} For elements the knowledge base does not cover, the user can search
+ChEBI and the Gene Ontology \cite{go2023} through EBI's Ontology Lookup Service, reviewed UniProt entries
+\cite{uniprot2023}, and Rhea \cite{bansal2022rhea}. Rhea is queried by the ChEBI identifiers of a
+reaction's identified participants, or by enzyme name or EC number, and the results are ranked by how well
+their participants match the model reaction. These searches are made only on request; the text sent is
+shown before sending.
+
+\section{Evaluation}
+Every fifth curated BioModels model (215 of 1,075, chosen by model number) was held out, and a knowledge
+base was built without them. The engine was given the names, identifiers, compartments and reaction
+participants of each test model, but not its annotations. The curators' \texttt{bqbiol:is} and
+\texttt{isVersionOf} annotations served as the answer key. Only elements annotated with an entry present in
+the knowledge base can be graded: 1,267 of 3,569 annotated species and 641 of 4,095 annotated reactions. The
+remainder are mostly proteins, complexes and pathway-level terms outside the scope of a metabolism
+knowledge base. Some test models are close variants of training models; we therefore also report the 133
+test models whose species names overlap by less than 50\% with every training model (610 species and 404
+reactions graded). Table~\ref{tab:results} gives the contribution of each source of evidence on these
+models.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lcc}
+\toprule
+Evidence used (133 novel test models) & Species right first & Reactions right first \\
+\midrule
+Name lookup only & 85.1\% & \phantom{0}6.9\% \\
++ name decoder & 88.7\% & 32.7\% \\
++ reaction context (version 1.0.0) & 90.8\% & 82.7\% \\
+\bottomrule
+\end{tabular}
+\caption{Share of graded elements whose first suggestion matched the curators' annotation. Coverage (an
+element received any suggestion) was 96.7\% for species and 90.8\% for reactions; in the top three
+suggestions, 92.6\% and 84.4\%.}
+\label{tab:results}
+\end{table}
+\vspace{-0.5em}
+
+Reaction names rarely identify a reaction across models, so name lookup alone recovered few reactions
+on unseen models; most of the gain comes from matching participants. The confidence levels separate
+reliable from unreliable suggestions: on the 133 models, high-confidence suggestions (70.7\% of graded
+species with a suggestion, 30.2\% of reactions) were correct in 99.3\% and 100\% of cases, likely ones in
+88.9\% and 89.6\%, and uncertain ones in 41.4\% and 46.7\%. When all species were given as confirmed, the
+first reaction suggestion was correct for 84.9\% of reactions (82.7\% without); confirming reactions changed
+species results little (91.0\% versus 90.8\%). On all 215 test models the first suggestion was correct for
+91.9\% of species and 82.1\% of reactions.
+
+The test models were held out of the knowledge base, but not out of development: the engine's rules, and
+the round-number thresholds of the confidence levels, were chosen while inspecting results on this test
+set. The figures above are therefore likely to be somewhat optimistic for models unlike those in BioModels.
+An independent check needs annotated models from outside BioModels, or a three-way split of the curated
+models.
+
+\section{Limitations}
+The automatic suggestions of version 1.0.0 cover small molecules and metabolic reactions. Proteins,
+complexes, genes and mRNAs, and signalling and gene-regulation reactions (binding, phosphorylation,
+transcription, degradation), are not suggested from the knowledge base; adding them is planned for version 2.
+Models of signalling and gene regulation can nevertheless be annotated manually with the same tool: proteins
+can be found with the UniProt search, terms and qualifiers added and edited, SBO terms set, and the model as
+a whole annotated as for any other model. The knowledge base reflects
+BiGG's coverage, which is weighted towards microbial and human central metabolism. The answer key consists
+of curators' annotations, which are themselves sometimes broad (an EC number for a specific reaction) or
+inconsistent between models, and elements annotated with entries outside the knowledge base are not graded,
+so the figures describe performance on the annotatable part of the models. Rankings may change when the
+underlying databases are updated. BiGG data from its legacy release is licensed for educational, research
+and non-profit use; its notice is distributed with the knowledge base and shown in the application.
+
+\section{Availability}
+The application is available at \url{https://sys-bio.github.io/PathwayAnnotator/} and the source at
+\url{https://github.com/sys-bio/PathwayAnnotator} under the MIT or Apache-2.0 licence. The repository
+includes the benchmark program and its full results, and the data snapshot from which the published
+knowledge base is built. Data sources: BiGG Models (CC BY 4.0 and the BiGG Models licence), ChEBI (CC BY 4.0),
+BioModels (CC0).
+
+\section*{Acknowledgements}
+This work was supported by NIH Biomedical Imaging and Bioengineering award P41 EB023912 through HMS at the
+Center for Reproducible Biomedical Modeling (\url{https://reproduciblebiomodels.org}). The software was
+developed with the assistance of Claude Code (Anthropic).
+
+{\small
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+}
+
+\end{document}

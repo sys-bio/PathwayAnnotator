@@ -645,6 +645,22 @@ Renaming SBML ids (2026-11-14), `annot_model::Workspace::rename`:
   packages' raw XML (it could be done for well-known ones such as FBC);
   renaming in Antimony text (an Antimony model is exported as SBML).
 
+Planned for version 2 (decided 2026-11-14): proteins and genes.
+- Version 1.0.0 suggests only small molecules (BiGG metabolites) and
+  metabolic reactions from the knowledge base. Proteins, complexes, genes
+  and mRNAs, and signalling and gene-regulation reactions (binding,
+  dissociation, phosphorylation, transcription, degradation), get no
+  automatic suggestions; users find proteins with the UniProt search and
+  annotate the rest by hand (SBO terms, GO). In the benchmark's 215 test
+  models, 2,302 of 3,569 annotated species and 3,454 of 4,095 annotated
+  reactions were annotated with entries outside the 1.0.0 knowledge base,
+  mostly of these kinds.
+- Version 2 adds knowledge for them: proteins (UniProt entries with gene
+  and protein names and synonyms, per organism), genes, and signalling
+  reactions (a source such as Reactome or SIGNOR), so the name, decoder
+  and reaction-context providers work on them too. Their benchmark grading
+  then covers the elements 1.0.0 leaves ungraded.
+
 Known issues / next (in order):
 - Done (2026-11-14): "Accept all" is now one undo step (`Workspace::batch`
   groups edits into one `Change::Group`).
