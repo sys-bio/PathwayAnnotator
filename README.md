@@ -24,6 +24,8 @@ https://sys-bio.github.io/PathwayAnnotator/ by the workflow in
 repository). See [DESIGN.md](DESIGN.md) for the design, data sources and
 results.
 
+You can find a Zenodo technical report at https://zenodo.org/records/24237183
+
 ## How it suggests
 
 - **Names.** A dictionary of names from BiGG, ChEBI and curated BioModels
