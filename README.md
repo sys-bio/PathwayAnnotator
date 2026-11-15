@@ -25,6 +25,9 @@ repository). See [DESIGN.md](DESIGN.md) for the design, data sources and
 results.
 
 You can find a Zenodo technical report at https://zenodo.org/records/24237183
+(DOI: [10.5281/zenodo.24237183](https://doi.org/10.5281/zenodo.24237183)). To cite PathwayAnnotator:
+Sauro, H. M. (2026). PathwayAnnotator: A Web-based SBML Annotation Tool for Biochemical Networks.
+Zenodo. https://doi.org/10.5281/zenodo.24237183
 
 ## How it suggests
 
