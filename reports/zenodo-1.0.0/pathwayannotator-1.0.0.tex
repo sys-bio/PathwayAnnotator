@@ -19,7 +19,8 @@
   \small $^{1}$Department of Bioengineering, University of Washington, Seattle, WA, 98195-5061, USA\\
   \small $^{2}$eScience Institute, University of Washington, Seattle, WA, 98195-5061, USA
 }
-\date{\small Version 1.0.0, November 2026}
+\date{\small Version 1.0.0, November 2026\\
+  DOI: \href{https://doi.org/10.5281/zenodo.24237183}{10.5281/zenodo.24237183}}
 
 \begin{document}
 \maketitle
@@ -51,7 +52,7 @@ Annotations link the elements of a model to entries in external resources, so th
 Systems Biology Ontology (SBO) terms \cite{courtot2011sbo}. Adding them by hand requires looking up every
 element, and many published models are partly annotated or not annotated at all. Earlier tools such as
 semanticSBML \cite{krause2010semanticsbml} and AMAS \cite{shin2023amas} address the same task. PathwayAnnotator
-was written to combine automated suggestion with review by the modeller in a tool that needs no
+was written to be easy to use and to combine automated suggestion with review by the modeller in a tool that needs no
 installation and sends no model data to a server.
 
 \section{Design}
@@ -96,10 +97,12 @@ their participants match the model reaction. These searches are made only on req
 shown before sending.
 
 \section{Evaluation}
-Every fifth curated BioModels model (215 of 1,075, chosen by model number) was held out, and a knowledge
-base was built without them. The engine was given the names, identifiers, compartments and reaction
-participants of each test model, but not its annotations. The curators' \texttt{bqbiol:is} and
-\texttt{isVersionOf} annotations served as the answer key. Only elements annotated with an entry present in
+Every fifth curated BioModels model (215 of 1,075, chosen by model number) was set aside as a test set. For
+the evaluation, a separate knowledge base was built from BiGG, ChEBI and the remaining 860 models, so that
+none of its names came from a test model; the published knowledge base uses all 1,075. Each test model was
+then re-annotated as if it had no annotations: the engine was given the names, identifiers, compartments and
+reaction participants of its elements, but not their existing annotations. Its suggestions were compared with
+the curators' \texttt{bqbiol:is} and \texttt{isVersionOf} annotations, which served as the answer key. Only elements annotated with an entry present in
 the knowledge base can be graded: 1,267 of 3,569 annotated species and 641 of 4,095 annotated reactions. The
 remainder are mostly proteins, complexes and pathway-level terms outside the scope of a metabolism
 knowledge base. Some test models are close variants of training models; we therefore also report the 133
@@ -159,7 +162,13 @@ The application is available at \url{https://sys-bio.github.io/PathwayAnnotator/
 \url{https://github.com/sys-bio/PathwayAnnotator} under the MIT or Apache-2.0 licence. The repository
 includes the benchmark program and its full results, and the data snapshot from which the published
 knowledge base is built. Data sources: BiGG Models (CC BY 4.0 and the BiGG Models licence), ChEBI (CC BY 4.0),
-BioModels (CC0).
+BioModels (CC0). This report is archived on Zenodo, \href{https://doi.org/10.5281/zenodo.24237183}{doi:10.5281/zenodo.24237183}.
+
+\section*{Use of AI}
+
+Claude Code (Anthropic, Opus 5.5, medium) was used to assist in writing the software and in preparing this report. Specifically Claude was used to help write the software, debug the code, create the tests and handle submissions of code to the GitHub repo. The test suite and the Rust linter Clippy were run on the code before each commit. Licences of the data sources were checked and their required notices included with the knowledge base.
+
+Claude was also used to run tests and collate information on the results of the evaluation. All text was reedited multiple times by the author to ensure accuracy, specificity, and clarity. The author reviewed, verified, and edited all generated content and takes full responsibility for the integrity and accuracy of the final publication. Lessons for AI development as reported for Iridium~\cite{iridium2026} were employed throughout. This section was written by the author.
 
 \section*{Acknowledgements}
 This work was supported by NIH Biomedical Imaging and Bioengineering award P41 EB023912 through HMS at the
@@ -170,5 +179,119 @@ developed with the assistance of Claude Code (Anthropic).
 \bibliographystyle{unsrtnat}
 \bibliography{references}
 }
+
+\appendix
+\section{The evaluation in plain language}
+The evaluation asks one question: how well does PathwayAnnotator identify what the species and reactions of
+an SBML model are, when it has not seen that model before? It was answered by taking curated BioModels models,
+hiding their existing annotations from the software, and checking whether it could reconstruct them.
+
+\subsection*{How the test was organised}
+The starting point was the 1,075 curated models in BioModels, divided into two groups:
+\begin{itemize}\itemsep0pt
+\item 860 models, used, together with BiGG and ChEBI, to build the knowledge base used for the test. The
+  models contribute only the names that modellers use for molecules and reactions; most of the knowledge base
+  comes from BiGG and ChEBI. (The published knowledge base uses all 1,075 models.)
+\item 215 models, set aside for testing.
+\end{itemize}
+A system should not be tested on information it has already been given. For each of the 215 test models, the
+existing annotations were hidden from the software, which received only what an unannotated model provides:
+species names and identifiers, compartments, and reaction participants. It then suggested database
+annotations, and the models' existing annotations served as the answer key. The test therefore simulates a
+user opening an unannotated model and asking PathwayAnnotator to identify its components.
+
+\subsection*{Not everything could be tested}
+The knowledge base of version 1.0.0 covers small molecules and metabolic reactions. It does not cover
+proteins, genes, protein complexes or signalling reactions (these are planned for version 2), so many model
+elements could not be graded:
+
+\begin{center}\small
+\begin{tabular}{lrr}
+\toprule
+Element & Annotated in the test models & Could be graded \\
+\midrule
+Species & 3,569 & 1,267 \\
+Reactions & 4,095 & 641 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Only about 35\% of the annotated species and 16\% of the annotated reactions could be included. This does not
+mean the software failed on the others: they were outside the scope of the knowledge base and could not be
+scored. All accuracy figures refer to the graded elements only.
+
+\subsection*{A harder test: models unlike the training models}
+Some test models are very similar to models in the training group; two models may describe the same pathway
+with slightly different names. A closely related training model can then supply most of what is needed to
+identify a test model's components. The analysis was therefore repeated on the 133 test models whose species
+names overlap by less than 50\% with every training model, which leaves 610 species and 404 reactions to grade.
+These 133 models give a better indication of how the software performs on models it has not encountered.
+
+\subsection*{What the accuracy numbers mean}
+Three versions of the suggestion engine were tested, each adding a method to the previous one. The table gives
+the percentage of first suggestions that were correct on the 133 models.
+
+\begin{center}\small
+\begin{tabular}{lrr}
+\toprule
+Methods used & Species & Reactions \\
+\midrule
+Name lookup & 85.1\% & 6.9\% \\
+Name lookup and decoder & 88.7\% & 32.7\% \\
+Name lookup, decoder and reaction context & 90.8\% & 82.7\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\emph{Name lookup.} The software looks for an exact match of a species or reaction name in its knowledge base:
+if the model contains \texttt{ATP}, it looks up ATP. This works for most species but rarely for reactions,
+because reaction names are often arbitrary: one model calls a reaction \texttt{HEX1}, another
+\texttt{hexokinase}, another something else again.
+
+\emph{Name decoder.} The software interprets names that do not match exactly, removing prefixes, compartment
+names or charges to find the underlying molecule. This raises species accuracy from 85.1\% to 88.7\% and
+reaction accuracy from 6.9\% to 32.7\%.
+
+\emph{Reaction context.} Instead of looking only at a reaction's name, the software looks at the molecules
+taking part in it. If a model contains a reaction $\mathrm{A} + \mathrm{ATP} \rightarrow \mathrm{B} +
+\mathrm{ADP}$ and the software has identified those molecules, it can look for known database reactions with
+the same participants. This raises reaction accuracy from 32.7\% to 82.7\%: for identifying reactions, the
+molecules involved carry far more information than the names.
+
+\subsection*{What the confidence levels mean}
+PathwayAnnotator labels each suggestion high, likely or uncertain. The test checked how often suggestions at
+each level were correct:
+
+\begin{center}\small
+\begin{tabular}{lrr}
+\toprule
+Confidence & Species correct & Reactions correct \\
+\midrule
+High & 99.3\% & 100\% \\
+Likely & 88.9\% & 89.6\% \\
+Uncertain & 41.4\% & 46.7\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+When the software labels a species suggestion high confidence, it was correct 99.3\% of the time in this test.
+Not every suggestion is labelled that way: 70.7\% of species and 30.2\% of reactions with a suggestion were
+high confidence. The confidence thresholds were chosen after examining the test results, so these figures are
+not yet an independent demonstration that the levels are calibrated.
+
+\subsection*{What happens when the user confirms annotations}
+The test also looked at whether confirming some annotations helps with the rest. When all species were treated
+as confirmed, reaction accuracy rose from 82.7\% to 84.9\%: knowing exactly which molecules take part in a
+reaction helps identify it. When all reactions were treated as confirmed, species accuracy barely changed
+(90.8\% to 91.0\%), because most species are already identified from their names.
+
+\subsection*{Limitations of the evaluation}
+Although the test models were excluded from the knowledge base, they were not excluded from development: the
+suggestion methods were refined, and the confidence thresholds chosen, while looking at the test results. The
+reported performance is therefore likely somewhat optimistic. A more rigorous assessment would use annotated
+models from outside BioModels, or divide the BioModels collection into three groups: models used to build the
+knowledge base, models used to refine the methods, and models used only for the final test. The accuracy
+figures (90.8\% of species and 82.7\% of reactions) are percentages of the elements that could be graded, using
+the first suggestion only, not of all annotations in the test models.
 
 \end{document}
