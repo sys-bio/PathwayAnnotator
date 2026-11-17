@@ -291,6 +291,16 @@ where
 {
     let ctx = expect_context::<Ctx>();
     let dragging = RwSignal::new(false);
+    let pasted = RwSignal::new(String::new());
+    // SBML is XML and starts with '<'; anything else is read as Antimony.
+    let open_pasted = move || {
+        let text = pasted.get_untracked();
+        if text.trim().is_empty() {
+            return;
+        }
+        let name = if text.trim_start().starts_with('<') { "pasted-model.xml" } else { "pasted-model.ant" };
+        open(text, name.into());
+    };
     let read = move |file: web_sys::File| {
         spawn_local(async move {
             match browser::read_file(&file).await {
@@ -334,6 +344,33 @@ where
                 />
                 <span class="drop-text">"Drop a model file here, or click to choose one"</span>
             </label>
+            <div class="paste">
+                <label for="paste-model">"Or paste SBML or Antimony text:"</label>
+                <textarea
+                    id="paste-model"
+                    rows="8"
+                    spellcheck="false"
+                    placeholder="model example\n  J1: S1 -> S2; k1*S1\n  S1 = 10; k1 = 0.1\nend"
+                    prop:value=move || pasted.get()
+                    on:input=move |ev| pasted.set(event_target_value(&ev))
+                    on:keydown=move |ev: web_sys::KeyboardEvent| {
+                        if ev.key() == "Enter" && (ev.ctrl_key() || ev.meta_key()) {
+                            ev.prevent_default();
+                            open_pasted();
+                        }
+                    }
+                ></textarea>
+                <div class="paste-actions">
+                    <button
+                        class="primary"
+                        disabled=move || pasted.with(|t| t.trim().is_empty())
+                        on:click=move |_| open_pasted()
+                    >
+                        "Open pasted model"
+                    </button>
+                    <span class="muted">"Ctrl+Enter also opens it."</span>
+                </div>
+            </div>
             <p class="or">
                 "No model at hand? "
                 <button class="link" on:click=move |_| open(EXAMPLE.to_string(), "glycolysis-example.ant".into())>

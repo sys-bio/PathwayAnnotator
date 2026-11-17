@@ -86,6 +86,15 @@ label.drop {
 label.drop.dragging { border-color: var(--accent); }
 label.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .drop-text { color: var(--muted); }
+.paste { margin-top: 16px; }
+.paste label { display: block; margin-bottom: 4px; color: var(--muted); }
+.paste textarea {
+  width: 100%; box-sizing: border-box; font-family: ui-monospace, Consolas, monospace; font-size: 13px;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; resize: vertical;
+}
+.paste textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.paste-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; font-size: 13px; }
 .or { color: var(--muted); }
 
 .loading, .empty, .muted { color: var(--muted); }
