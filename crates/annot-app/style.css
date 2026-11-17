@@ -78,6 +78,15 @@ header.top .actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6p
 /* Start */
 .start { max-width: 640px; margin: 40px auto; }
 .start h2 { margin-top: 0; }
+.purpose {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px 20px; margin-bottom: 28px; line-height: 1.5;
+}
+.purpose p { margin: 0 0 8px; }
+.purpose ul { margin: 0 0 10px; padding-left: 20px; }
+.purpose li { margin-bottom: 4px; }
+.purpose .link { font-size: inherit; }
+.purpose p.purpose-links { margin: 0; color: var(--muted); }
 label.drop {
   display: flex; align-items: center; justify-content: center; min-height: 140px;
   border: 2px dashed var(--border); border-radius: 10px; background: var(--surface);

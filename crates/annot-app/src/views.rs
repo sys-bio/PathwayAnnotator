@@ -73,6 +73,10 @@ struct Ctx {
     /// The knowledge pack's header: when it was built, and its sources
     /// with their licenses and the notices they require.
     pack_header: RwSignal<Option<kpack::Header>>,
+    /// The model's SBML as last opened from or saved to a file.
+    saved: RwSignal<Option<String>>,
+    /// Whether the open model has changes not saved to a file.
+    unsaved: RwSignal<bool>,
 }
 
 /// Opens an element in its tab and scrolls it into view.
@@ -154,10 +158,26 @@ pub fn App() -> impl IntoView {
         about: RwSignal::new(false),
         guide: RwSignal::new(false),
         pack_header: RwSignal::new(None),
+        saved: RwSignal::new(None),
+        unsaved: RwSignal::new(false),
     };
     provide_context(ctx);
     // Lives as long as the page: the app never unmounts.
     let _keys = window_event_listener(leptos::ev::keydown, move |ev| on_key(ctx, ev));
+    // Reloading or closing the page with unsaved changes asks first.
+    let _leave = window_event_listener(leptos::ev::beforeunload, move |ev| {
+        if ctx.unsaved.get_untracked() {
+            ev.prevent_default();
+            ev.set_return_value("You have unsaved changes.");
+        }
+    });
+
+    // Tracks whether the open model differs from the file it came from
+    // or was last saved to.
+    Effect::new(move |_| {
+        let sbml = ctx.session.with(|s| s.as_ref().map(|s| s.ws.to_sbml()));
+        ctx.unsaved.set(sbml.is_some_and(|t| ctx.saved.with(|saved| saved.as_deref() != Some(t.as_str()))));
+    });
 
     spawn_local(async move {
         match browser::fetch_pack("kpack.bin").await {
@@ -176,6 +196,7 @@ pub fn App() -> impl IntoView {
         };
         match annot_model::load(&text) {
             Ok(ws) => {
+                ctx.saved.set(Some(ws.to_sbml()));
                 ctx.organism.set(ws.model_taxon());
                 let mut session = Session::new(p, ws, name);
                 session.remember_online(browser::remembered_names());
@@ -235,7 +256,10 @@ fn Header() -> impl IntoView {
         let out = s.with_untracked(|s| s.as_ref().map(|s| (s.export_name(), s.ws.to_sbml())));
         if let Some((name, text)) = out {
             match browser::save_file(&name, &text) {
-                Ok(()) => ctx.message.set(Some(format!("Saved {name}."))),
+                Ok(()) => {
+                    ctx.saved.set(Some(text));
+                    ctx.message.set(Some(format!("Saved {name}.")));
+                }
                 Err(e) => ctx.message.set(Some(format!("Could not save: {e}."))),
             }
         }
@@ -311,11 +335,44 @@ where
     };
     view! {
         <section class="start">
+            <div class="purpose">
+                <h2>"Say what your model is made of"</h2>
+                <p>
+                    "In a model, a molecule called " <code>"G6P"</code> " or " <code>"S1"</code>
+                    " means little to anyone but its author. Annotation links each molecule, reaction and "
+                    "compartment to the database entry it stands for (ChEBI, Rhea, KEGG, GO and others), so that "
+                    "people and software can tell what it is. Annotated models are easier to find, check, reuse "
+                    "and combine; the curated models in BioModels are annotated this way."
+                </p>
+                <p>"Doing this by hand is slow. PathwayAnnotator helps:"</p>
+                <ul>
+                    <li>
+                        <b>"It suggests."</b>
+                        " For each molecule, metabolic reaction and compartment it proposes a database entry, with a confidence "
+                        "level, using a knowledge base built from BiGG, ChEBI and BioModels."
+                    </li>
+                    <li>
+                        <b>"You decide."</b>
+                        " Every suggestion shows its evidence and links to the database entry; nothing is added "
+                        "to the model until you accept it."
+                    </li>
+                    <li>
+                        <b>"Your model stays private."</b>
+                        " Everything runs in your browser; the model is not uploaded. Online searches happen only "
+                        "when you ask for one."
+                    </li>
+                </ul>
+                <p>
+                    "When you are done, save the model as SBML with the annotations included."
+                </p>
+                <p class="purpose-links">
+                    <button class="link" on:click=move |_| ctx.guide.set(true)>"How it works"</button>
+                    " | "
+                    <button class="link" on:click=move |_| ctx.about.set(true)>"About and data sources"</button>
+                </p>
+            </div>
             <h2>"Annotate a model"</h2>
-            <p>
-                "Open an SBML or Antimony model. The annotator suggests what each molecule and reaction is, "
-                "with the evidence, for you to confirm. Your model stays on this computer."
-            </p>
+            <p>"Open an SBML or Antimony model to start."</p>
             <label
                 class="drop"
                 class:dragging=move || dragging.get()
