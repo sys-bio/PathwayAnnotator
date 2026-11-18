@@ -982,6 +982,21 @@ fn RenameId(el: Element) -> impl IntoView {
             None => {}
         }
     };
+    // One click: rename to the name of what it was identified as.
+    let offer = move || s.with(|s| s.as_ref().and_then(|s| s.id_from_identity(el)));
+    let rename_to = move |new_id: String| {
+        let mut result = None;
+        s.update(|s| {
+            if let Some(s) = s {
+                result = Some(s.rename(el, &new_id));
+            }
+        });
+        match result {
+            Some(Ok(msg)) => ctx.message.set(Some(msg)),
+            Some(Err(e)) => ctx.message.set(Some(format!("Could not rename to {new_id}: {e}"))),
+            None => {}
+        }
+    };
     let input_id = format!("rename-{}", dom_id(el));
     // Focus the field, with its text selected, when it opens: the user
     // types the new id straight away. (The autofocus attribute only works
@@ -1004,6 +1019,22 @@ fn RenameId(el: Element) -> impl IntoView {
                         <span class="muted">"SBML id: "</span>
                         <code>{current}</code>
                         <button class="link" on:click=start>"Rename"</button>
+                        {move || {
+                            offer()
+                                .map(|id| {
+                                    let label = format!("Rename to {id}");
+                                    view! {
+                                        " "
+                                        <button
+                                            class="link"
+                                            title="Use the name of what it is identified as as its SBML id"
+                                            on:click=move |_| rename_to(id.clone())
+                                        >
+                                            {label}
+                                        </button>
+                                    }
+                                })
+                        }}
                     }
                 }
             >

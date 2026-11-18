@@ -180,6 +180,25 @@ pub fn readable_date(w3c: &str) -> String {
     if hm.is_empty() || hm == "00:00" { date.to_string() } else { format!("{date} {hm} UTC") }
 }
 
+/// A name made into a valid SBML id: "D-glucose 6-phosphate" ->
+/// "D_glucose_6_phosphate". Characters other than ASCII letters and digits
+/// become underscores; an id may not start with a digit.
+pub fn sbml_id_from(name: &str) -> Option<String> {
+    let mut id = String::new();
+    for c in name.chars() {
+        if c.is_ascii_alphanumeric() {
+            id.push(c);
+        } else if !id.is_empty() && !id.ends_with('_') {
+            id.push('_');
+        }
+    }
+    let id = id.trim_end_matches('_');
+    if id.is_empty() {
+        return None;
+    }
+    Some(if id.starts_with(|c: char| c.is_ascii_digit()) { format!("_{id}") } else { id.to_string() })
+}
+
 /// Counts for the overview.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Counts {
@@ -695,6 +714,18 @@ impl Session {
         ))
     }
 
+    /// An SBML id made from a species' accepted identity, offered as a
+    /// one-click rename ("X" -> "ADP"). `None` if the species is not
+    /// identified, or its id already is that.
+    pub fn id_from_identity(&self, el: Element) -> Option<String> {
+        if !matches!(el, Element::Species(_)) {
+            return None;
+        }
+        let target = *self.identified_as(el).first()?;
+        let id = sbml_id_from(&self.label(target))?;
+        (id != self.ws.element_id(el)).then_some(id)
+    }
+
     /// Accepts every High suggestion, as one undoable step.
     pub fn accept_all_high(&mut self) -> usize {
         let todo: Vec<(Element, Target)> = self
@@ -1058,5 +1089,19 @@ impl Session {
             .rsplit_once('.')
             .map_or(self.file_name.as_str(), |(s, _)| s);
         format!("{stem}-annotated.xml")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sbml_id_from;
+
+    #[test]
+    fn names_become_valid_sbml_ids() {
+        assert_eq!(sbml_id_from("ADP").as_deref(), Some("ADP"));
+        assert_eq!(sbml_id_from("D-glucose 6-phosphate").as_deref(), Some("D_glucose_6_phosphate"));
+        assert_eq!(sbml_id_from("NAD(+)").as_deref(), Some("NAD"));
+        assert_eq!(sbml_id_from("3-phospho-D-glycerate").as_deref(), Some("_3_phospho_D_glycerate"));
+        assert_eq!(sbml_id_from("()").as_deref(), None);
     }
 }
