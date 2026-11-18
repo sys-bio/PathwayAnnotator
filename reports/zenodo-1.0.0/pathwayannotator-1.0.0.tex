@@ -82,6 +82,27 @@ candidate. Elements the user confirms or rejects
 are fed back to the engine, which re-ranks the remaining suggestions; a reaction whose participants have all
 been confirmed and which matches a single knowledge-base reaction becomes high confidence.
 
+\textbf{Reaction context.} Reaction context works in four steps. (1)~\emph{Anchors.} A species whose best
+candidate from name lookup or the decoder scores well and clearly ahead of the next candidate is taken to be
+that entity; species the user has confirmed, or that the model already annotates, are anchors whatever the
+scores. (2)~\emph{Matching.} Each model reaction is compared with the knowledge-base reactions that contain
+its anchored species. Direction and compartments are ignored, and common cofactors (ATP, ADP, NAD, H$^+$,
+water and similar) may be absent from the model, since kinetic models often omit them. A knowledge-base
+reaction fits if every anchored species other than a cofactor appears on the corresponding side; when three
+or more match, one may be missing, since models often lump steps. Fits are ranked by the number of species
+they explain, and cofactors in the knowledge-base reaction that the model does not show count slightly
+against a fit. Transport reactions are considered only when the model reaction spans compartments.
+(3)~\emph{Leftovers.} For a species that is not an anchor, the participants of a fitting reaction left
+unexplained on its side are candidates for it: a single leftover is strong evidence, two are weaker. Evidence
+from different reactions adds up, and fitting reactions also become candidates for the model reaction itself.
+(4)~\emph{Spreading.} Species identified this way anchor a second round, so identifications spread along a
+pathway. For example, in $\mathrm{Glucose} + \mathrm{ATP} \rightarrow \mathrm{G6P} + \mathrm{X}$ the best fit
+is hexokinase, glucose + ATP $\rightarrow$ glucose 6-phosphate + ADP + H$^+$,
+which leaves ADP and H$^+$ for X. A refinement made after version 1.0.0 sets H$^+$ and water aside when only
+cofactors are left over, gives full weight to a cofactor that pairs with one the model shows (ADP when the
+model's ATP matched), and counts a cofactor the model shows but a reaction lacks against that reaction; with
+it, X is suggested as ADP. This refinement left the evaluation results below unchanged.
+
 \textbf{Review and editing.} For each element the interface shows the suggestion, its confidence level,
 synonyms, links to the database entries, and the evidence. Accepting writes a \texttt{bqbiol:is} term with
 identifiers.org URIs and, where none is present, an SBO term. Users can change qualifiers, add or remove
