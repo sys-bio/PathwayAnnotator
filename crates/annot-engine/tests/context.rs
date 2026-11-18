@@ -195,3 +195,18 @@ fn a_rejected_suggestion_does_not_come_back() {
     let s = annotate(&p, &m);
     assert!(!s.reactions[0].iter().any(|c| c.target == Target::Reaction(hex1)));
 }
+
+/// Kinetic models leave out H+: in "glucose + ATP -> G6P + X" read as
+/// hexokinase, ADP and H+ are left over for X, and X is ADP.
+#[test]
+fn a_cofactor_is_found_when_h_plus_is_left_out() {
+    let mut m = model();
+    m.species[2] = species("X", None);
+    m.species[3] = species("G6P", Some("D-glucose 6-phosphate"));
+    let p = pack();
+    let s = annotate(&p, &m);
+    let first = &s.species[2][0];
+    let Target::Entity(e) = first.target else { panic!("{:?}", first.target) };
+    assert_eq!(p.str(p.entity(e).label), "ADP", "{:?}", s.species[2]);
+    assert!(first.evidence.iter().any(|e| e.provider == "context" && e.note.contains("remaining product")));
+}

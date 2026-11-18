@@ -63,6 +63,9 @@ struct Fit {
     currency_matched: usize,
     /// Currency metabolites in the pack reaction the model does not show.
     currency_left: usize,
+    /// Anchored currency metabolites the model shows that the pack
+    /// reaction lacks (ATP in the model, a reaction without ATP).
+    currency_absent: usize,
     missing: usize,
     /// Pack participants nothing matched: (entity, side as the model reads it).
     leftover: Vec<(EntityId, Side)>,
@@ -262,7 +265,10 @@ fn pinned_by_reactions(
             let (picked, weight, complete) = match core.len() {
                 1 => (core, PINNED_ONE, others_confirmed && f.missing == 0),
                 2 => (core, PINNED_TWO, false),
-                0 if on_side.len() == 1 => (on_side, PINNED_CURRENCY, false),
+                0 => match lone_cofactor(pack, &on_side) {
+                    Some(e) => (vec![e], PINNED_CURRENCY, false),
+                    None => continue,
+                },
                 _ => continue,
             };
             let role = if side == Side::Left { "substrate" } else { "product" };
@@ -293,6 +299,25 @@ pub const COMPLETE_BONUS: f32 = 0.5;
 
 fn is_currency(pack: &Pack, e: EntityId) -> bool {
     pack.entity(e).flags.contains(EntityFlags::CURRENCY)
+}
+
+/// H+ or water: cofactors kinetic models almost never show.
+fn is_proton_or_water(pack: &Pack, e: EntityId) -> bool {
+    let ent = pack.entity(e);
+    is_currency(pack, e) && ent.formula.is_some_and(|f| matches!(pack.str(f), "H" | "H2O"))
+}
+
+/// When only cofactors are left on a side, the one a model species can
+/// stand for: the only one, or the only one besides H+ and water, which
+/// models leave out ("Glc + ATP -> G6P + X" leaves ADP and H+; X is ADP).
+fn lone_cofactor(pack: &Pack, on_side: &[EntityId]) -> Option<EntityId> {
+    if let [e] = on_side {
+        return Some(*e);
+    }
+    match on_side.iter().filter(|e| !is_proton_or_water(pack, **e)).collect::<Vec<_>>()[..] {
+        [e] => Some(*e),
+        _ => None,
+    }
 }
 
 /// Species whose best candidate is clear, scoring at least `min`: species
@@ -434,7 +459,7 @@ fn fit(pack: &Pack, known: &[(EntityId, Side)], r: ReactionId, flip: bool) -> Op
         })
         .collect();
     let mut used = vec![false; parts.len()];
-    let (mut matched, mut missing, mut currency_matched) = (0, 0, 0);
+    let (mut matched, mut missing, mut currency_matched, mut currency_absent) = (0, 0, 0, 0);
     for &(e, side) in known {
         match parts.iter().enumerate().position(|(i, p)| !used[i] && *p == (e, side)) {
             Some(i) => {
@@ -445,7 +470,7 @@ fn fit(pack: &Pack, known: &[(EntityId, Side)], r: ReactionId, flip: bool) -> Op
                     matched += 1;
                 }
             }
-            None if is_currency(pack, e) => {}
+            None if is_currency(pack, e) => currency_absent += 1,
             None => missing += 1,
         }
     }
@@ -463,12 +488,18 @@ fn fit(pack: &Pack, known: &[(EntityId, Side)], r: ReactionId, flip: bool) -> Op
     // them) but count a little against the fit: "G6P -> X" is the
     // isomerase, not hexokinase backwards with ATP, ADP and H+ unexplained.
     let currency_left = leftover.iter().filter(|(e, _)| is_currency(pack, *e)).count();
-    let score = matched as f32 + 0.25 * currency_matched as f32 - missing as f32 - 0.1 * currency_left as f32;
+    // A cofactor the model shows that the reaction lacks counts more:
+    // "F6P + ATP -> FBP + X" is the kinase, not the phosphatase.
+    let score = matched as f32 + 0.25 * currency_matched as f32
+        - missing as f32
+        - 0.1 * currency_left as f32
+        - 0.5 * currency_absent as f32;
     Some(Fit {
         reaction: r,
         matched,
         currency_matched,
         currency_left,
+        currency_absent,
         missing,
         leftover,
         score,
@@ -509,13 +540,23 @@ fn species_evidence(
                 // (ATP -> ADP in a kinase) count a little.
                 let quality = (0.5 + 0.25 * f.matched as f32 + 0.1 * f.currency_matched as f32).min(1.0)
                     * if f.missing > 0 { 0.7 } else { 1.0 }
-                    / (1.0 + 0.1 * f.currency_left as f32);
+                    / (1.0 + 0.1 * f.currency_left as f32)
+                    * 0.6_f32.powi(f.currency_absent as i32);
                 let on_side: Vec<EntityId> = f.leftover.iter().filter(|(_, s)| *s == side).map(|(e, _)| *e).collect();
                 let core: Vec<EntityId> = on_side.iter().copied().filter(|e| !is_currency(pack, *e)).collect();
                 let (picked, base) = match core.len() {
                     1 => (core, LEFTOVER_ONE),
                     2 => (core, LEFTOVER_TWO),
-                    0 if on_side.len() == 1 => (on_side, LEFTOVER_CURRENCY),
+                    // A cofactor paired with one the model shows (ADP left
+                    // when the model's ATP matched) is as telling as any
+                    // other single leftover.
+                    0 => match lone_cofactor(pack, &on_side) {
+                        Some(e) if f.currency_matched > 0 && !is_proton_or_water(pack, e) => {
+                            (vec![e], LEFTOVER_ONE)
+                        }
+                        Some(e) => (vec![e], LEFTOVER_CURRENCY),
+                        None => continue,
+                    },
                     _ => continue,
                 };
                 let w = base * quality;

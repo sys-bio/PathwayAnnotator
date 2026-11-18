@@ -1,4 +1,4 @@
-# Annotation benchmark, 2026-11-14
+# Annotation benchmark, 2026-11-18
 
 - Models: 215 (test set), 0 unreadable
 - Engine providers: names, decoder, context
@@ -124,7 +124,7 @@ How often the first suggestion was right, by the engine's own          confidenc
 | BIOMD0000000560 | ROS |  | peroxynitrite (CE5643) / superoxide (o2s) / hypochlorous acid (CE4633) / hydrogen peroxide (h2o2) | 2-oxoglutarate (akg) | uncertain |
 | BIOMD0000000565 | cf6p | Fructose-6-Phosphate | D-fructose 6-phosphate (f6p_any) | beta-D-fructose 6-phosphate (f6p) | high |
 | BIOMD0000000565 | cg6p | Glucose-6-Phosphate | D-glucose 6-phosphate (g6p_any) | alpha-D-glucose 6-phosphate (g6p_A) | high |
-| BIOMD0000000575 | Neuromelanin | Neuromelanin | 5,6-dihydroxyindole (CE4888) | 3-sulfino-L-alanine (3sala) | uncertain |
+| BIOMD0000000575 | Neuromelanin | Neuromelanin | 5,6-dihydroxyindole (CE4888) | desferricoprogen (cpgn_un) | uncertain |
 | BIOMD0000000590 | ca | ca | N-carbamoyl-L-aspartate (cbasp) | calcium (ca2) | high |
 | BIOMD0000000590 | omp | omp | orotidine 5'-phosphate (orot5p) | UDP (udp) | uncertain |
 | BIOMD0000000590 | oro | oro | orotate (orot) | cytidine 5'-monophosphate (cmp) | uncertain |
