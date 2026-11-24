@@ -215,7 +215,7 @@ pub fn App() -> impl IntoView {
     let has_session = Memo::new(move |_| ctx.session.with(|s| s.is_some()));
 
     view! {
-        <Header/>
+        <Header open=open/>
         <main>
             {move || {
                 if let Some(e) = pack_error.get() {
@@ -247,9 +247,33 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
-fn Header() -> impl IntoView {
+fn Header<F>(open: F) -> impl IntoView
+where
+    F: Fn(String, String) + Copy + Send + Sync + 'static,
+{
     let ctx = expect_context::<Ctx>();
     let s = ctx.session;
+    // With unsaved changes, replacing or closing the model asks first.
+    let may_discard = move || {
+        !ctx.unsaved.get_untracked()
+            || browser::confirm("The current model has changes you have not saved. Continue without saving them?")
+    };
+    let open_file = move |ev: leptos::ev::Event| {
+        let input: web_sys::HtmlInputElement = event_target(&ev);
+        let file = input.files().and_then(|f| f.get(0));
+        // Choosing the same file again must fire change again.
+        input.set_value("");
+        let Some(file) = file else { return };
+        if !may_discard() {
+            return;
+        }
+        spawn_local(async move {
+            match browser::read_file(&file).await {
+                Ok(text) => open(text, file.name()),
+                Err(e) => ctx.message.set(Some(format!("Could not read {}: {e}.", file.name()))),
+            }
+        });
+    };
     let file = move || s.with(|s| s.as_ref().map(|s| s.file_name.clone()));
     let can_undo = move || s.with(|s| s.as_ref().is_some_and(|s| s.ws.can_undo()));
     let can_redo = move || s.with(|s| s.as_ref().is_some_and(|s| s.ws.can_redo()));
@@ -302,7 +326,11 @@ fn Header() -> impl IntoView {
                         "Redo"
                     </button>
                     <button class="primary" on:click=save>"Save annotated SBML"</button>
-                    <button on:click=move |_| s.set(None)>"Close"</button>
+                    <label class="button" title="Open another SBML or Antimony model">
+                        "Open model"
+                        <input type="file" accept=".xml,.sbml,.ant,.txt" on:change=open_file/>
+                    </label>
+                    <button on:click=move |_| if may_discard() { s.set(None) }>"Close"</button>
                 </div>
             </Show>
         </header>

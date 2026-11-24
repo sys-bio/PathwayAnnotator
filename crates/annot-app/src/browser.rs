@@ -88,6 +88,12 @@ pub fn remember_name(uri: &str, name: &str, label: &str) {
     let _ = store.set_item(NAMES_KEY, &serde_json::Value::Object(map).to_string());
 }
 
+/// Asks the user a yes/no question with the browser's own dialog.
+/// True if they agree (or there is no window to ask in).
+pub fn confirm(question: &str) -> bool {
+    web_sys::window().is_none_or(|w| w.confirm_with_message(question).unwrap_or(true))
+}
+
 /// The text of a file the user chose or dropped.
 pub async fn read_file(file: &web_sys::File) -> Result<String, String> {
     let text = JsFuture::from(file.text()).await.map_err(js_error)?;
