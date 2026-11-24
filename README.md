@@ -24,10 +24,10 @@ https://sys-bio.github.io/PathwayAnnotator/ by the workflow in
 repository). See [DESIGN.md](DESIGN.md) for the design, data sources and
 results.
 
-You can find a Zenodo technical report at https://zenodo.org/records/24237183
-(DOI: [10.5281/zenodo.24237183](https://doi.org/10.5281/zenodo.24237183)). To cite PathwayAnnotator:
+You can find a Zenodo technical report at https://zenodo.org/records/24517816
+(DOI: [10.5281/zenodo.24517816](https://doi.org/10.5281/zenodo.24517816)). To cite PathwayAnnotator:
 Sauro, H. M. (2026). PathwayAnnotator: A Web-based SBML Annotation Tool for Biochemical Networks.
-Zenodo. https://doi.org/10.5281/zenodo.24237183
+Zenodo. https://doi.org/10.5281/zenodo.24517816
 
 This work was supported by NIH Biomedical Imaging and Bioengineering award P41 EB023912 through HMS at the Center for Reproducible Biomedical Modeling reproduciblebiomodels.org
 

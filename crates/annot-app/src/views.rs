@@ -2544,8 +2544,8 @@ fn About() -> impl IntoView {
                 <p>
                     "To cite: Sauro, H. M. (2026). PathwayAnnotator: A Web-based SBML Annotation Tool for "
                     "Biochemical Networks. Zenodo. "
-                    <a href="https://doi.org/10.5281/zenodo.24237183" target="_blank" rel="noopener noreferrer">
-                        "doi:10.5281/zenodo.24237183"
+                    <a href="https://doi.org/10.5281/zenodo.24517816" target="_blank" rel="noopener noreferrer">
+                        "doi:10.5281/zenodo.24517816"
                     </a>
                 </p>
                 <p>
