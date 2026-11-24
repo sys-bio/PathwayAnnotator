@@ -237,6 +237,9 @@ pub struct Session {
     online_names: BTreeMap<String, String>,
     /// Papers looked up for the model's references (Europe PMC), by URI.
     papers: BTreeMap<String, annot_online::Paper>,
+    /// Today's date (YYYY-MM-DD), for the notes that record why an element
+    /// was identified. Set by the app; empty leaves the date out.
+    pub today: String,
 }
 
 impl Session {
@@ -257,6 +260,7 @@ impl Session {
             online_labels: BTreeMap::new(),
             online_names: BTreeMap::new(),
             papers: BTreeMap::new(),
+            today: String::new(),
         };
         s.refresh();
         s
@@ -530,7 +534,12 @@ impl Session {
         let Some((uri, label)) = self.compartment_suggestion(el) else {
             return format!("There is nothing to accept for {name}.");
         };
-        let msg = match self.ws.accept_uri(el, &uri, Some(annot_online::Db::Go.sbo())) {
+        let note = self.note_text(&format!(
+            "identified as {label} ({}), suggested because the compartment's name is a name for this Gene Ontology term.",
+            uri.rsplit('/').next().unwrap_or(&uri)
+        ));
+        let sbo = Some(annot_online::Db::Go.sbo());
+        let msg = match self.ws.batch(|ws| ws.accept_uri(el, &uri, sbo).and_then(|_| ws.set_tool_note(el, Some(&note)))) {
             Ok(()) => format!("{name} identified as {label}."),
             Err(e) => format!("Could not annotate {name}: {e}."),
         };
@@ -683,21 +692,58 @@ impl Session {
         let label = self.label(target);
         let name = self.display_name(el);
         let current = self.identified_as(el);
+        let note = self.evidence_note(el, target);
+        let pack = &self.pack;
         let msg = if current.contains(&target) {
             format!("{name} is already identified as {label}.")
         } else if current.is_empty() {
-            match self.ws.accept(&self.pack, el, target) {
+            match self.ws.batch(|ws| ws.accept(pack, el, target).and_then(|_| ws.set_tool_note(el, Some(&note)))) {
                 Ok(_) => format!("{name} identified as {label}."),
                 Err(e) => format!("Could not annotate {name}: {e}."),
             }
         } else {
-            match self.ws.replace_identity(&self.pack, el, target) {
+            match self
+                .ws
+                .batch(|ws| ws.replace_identity(pack, el, target).and_then(|_| ws.set_tool_note(el, Some(&note))))
+            {
                 Ok(_) => format!("{name} is now identified as {label} instead."),
                 Err(e) => format!("Could not change {name}: {e}."),
             }
         };
         self.refresh();
         msg
+    }
+
+    /// The note recording why `el` is identified as `target`, written into
+    /// its SBML notes when the identification is accepted: what it is, the
+    /// confidence, and the evidence shown in Details.
+    pub fn evidence_note(&self, el: Element, target: Target) -> String {
+        let label = self.label(target);
+        let what = match self.links(target).first() {
+            Some((text, _)) => format!("{label} ({text})"),
+            None => label,
+        };
+        let candidates = self.candidates(el);
+        let found = candidates.iter().position(|c| c.target == target);
+        let how = match (found, self.status(el)) {
+            (Some(0), Status::Suggested { level, .. }) => format!("suggested with {} confidence", level.label()),
+            (Some(_), _) => "chosen by the user from the suggestions".to_string(),
+            (None, _) => "chosen by the user".to_string(),
+        };
+        let evidence: Vec<String> = found
+            .map(|i| candidates[i].evidence.iter().map(|e| e.note.clone()).collect())
+            .unwrap_or_default();
+        let mut text = format!("identified as {what}, {how}.");
+        if !evidence.is_empty() {
+            text.push_str(&format!(" Evidence: {}.", evidence.join("; ")));
+        }
+        self.note_text(&text)
+    }
+
+    /// "PathwayAnnotator 1.0.0, 2026-11-24: " before `text`.
+    fn note_text(&self, text: &str) -> String {
+        let date = if self.today.is_empty() { String::new() } else { format!(", {}", self.today) };
+        format!("PathwayAnnotator {}{date}: {text}", env!("CARGO_PKG_VERSION"))
     }
 
     /// Renames an element's SBML id, updating every reference to it.
@@ -728,15 +774,22 @@ impl Session {
 
     /// Accepts every High suggestion, as one undoable step.
     pub fn accept_all_high(&mut self) -> usize {
-        let todo: Vec<(Element, Target)> = self
+        let todo: Vec<(Element, Target, String)> = self
             .species()
             .into_iter()
             .chain(self.reactions())
             .filter(|&el| matches!(self.status(el), Status::Suggested { level: Confidence::High, .. }))
-            .map(|el| (el, self.candidates(el)[0].target))
+            .map(|el| {
+                let t = self.candidates(el)[0].target;
+                (el, t, self.evidence_note(el, t))
+            })
             .collect();
         let pack = &self.pack;
-        let n = self.ws.batch(|ws| todo.iter().filter(|&&(el, t)| ws.accept(pack, el, t).is_ok()).count());
+        let n = self.ws.batch(|ws| {
+            todo.iter()
+                .filter(|(el, t, note)| ws.accept(pack, *el, *t).and_then(|_| ws.set_tool_note(*el, Some(note))).is_ok())
+                .count()
+        });
         self.refresh();
         n
     }
@@ -892,7 +945,15 @@ impl Session {
             return self.accept(el, target);
         }
         let what = format!("{} ({} {})", hit.label, hit.db.label(), hit.id);
-        let msg = match self.ws.accept_uri(el, &hit.uri, Some(hit.db.sbo())) {
+        let note = self.note_text(&format!(
+            "identified as {what}, chosen by the user from a search of {}.",
+            hit.db.label()
+        ));
+        let sbo = Some(hit.db.sbo());
+        let msg = match self
+            .ws
+            .batch(|ws| ws.accept_uri(el, &hit.uri, sbo).and_then(|_| ws.set_tool_note(el, Some(&note))))
+        {
             Ok(()) => {
                 self.online_labels.insert(hit.uri.clone(), what.clone());
                 self.online_names.insert(hit.uri.clone(), hit.label.clone());
@@ -930,7 +991,17 @@ impl Session {
     pub fn remove_term(&mut self, el: Element, key: &str, uri: &str) -> Result<String, String> {
         let name = self.display_name(el);
         let (model, q) = split_qualifier(key);
-        self.ws.remove_term_as(el, model, q, uri).map_err(|e| format!("Could not change {name}: {e}."))?;
+        self.ws
+            .batch(|ws| {
+                ws.remove_term_as(el, model, q, uri)?;
+                // With no identity left, the note saying why it was
+                // identified no longer applies.
+                if el != Element::Model && ws.identity_uris(el).is_empty() && ws.tool_note(el).is_some() {
+                    ws.set_tool_note(el, None)?;
+                }
+                Ok(())
+            })
+            .map_err(|e: annot_model::EditError| format!("Could not change {name}: {e}."))?;
         self.refresh();
         Ok(format!("Removed {uri} from {name}."))
     }

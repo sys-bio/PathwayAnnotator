@@ -95,6 +95,7 @@ label.drop {
 label.drop.dragging { border-color: var(--accent); }
 label.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .drop-text { color: var(--muted); }
+.tool-note { font-size: 13px; margin: 4px 0 8px; }
 .paste { margin-top: 16px; }
 .paste label { display: block; margin-bottom: 4px; color: var(--muted); }
 .paste textarea {

@@ -65,6 +65,79 @@ impl Workspace {
     }
 }
 
+/// The class of the notes paragraph PathwayAnnotator writes and replaces.
+const TOOL_CLASS: &str = "pathwayannotator";
+
+impl Workspace {
+    /// The paragraph PathwayAnnotator wrote into an element's notes (why
+    /// it was identified as what it is), as plain text.
+    pub fn tool_note(&self, el: Element) -> Option<String> {
+        let notes = self.meta(el).notes.as_deref()?;
+        let (start, end) = tool_paragraph(notes)?;
+        Some(notes_to_text(&notes[start..end]).trim().to_string())
+    }
+
+    /// Sets the paragraph PathwayAnnotator writes into an element's notes,
+    /// replacing the one it wrote before; `None` removes it. The rest of
+    /// the notes is kept as it is. One undoable edit.
+    pub fn set_tool_note(&mut self, el: Element, text: Option<&str>) -> Result<(), EditError> {
+        if !self.contains(el) {
+            return Err(EditError::NoSuchElement);
+        }
+        let mut meta = self.meta(el).clone();
+        meta.notes = with_tool_note(meta.notes.as_deref(), text);
+        self.apply(el, meta);
+        Ok(())
+    }
+}
+
+/// Where the tool's paragraph is in some notes XHTML: the byte range of
+/// `<p ... class="pathwayannotator">...</p>`.
+fn tool_paragraph(notes: &str) -> Option<(usize, usize)> {
+    let marker = format!("class=\"{TOOL_CLASS}\"");
+    let at = notes.find(&marker)?;
+    let start = notes[..at].rfind("<p")?;
+    let end = at + notes[at..].find("</p>")? + "</p>".len();
+    Some((start, end))
+}
+
+/// `notes` with the tool's paragraph replaced by `text` (or removed).
+fn with_tool_note(notes: Option<&str>, text: Option<&str>) -> Option<String> {
+    let mut rest = notes.unwrap_or("").to_string();
+    if let Some((start, end)) = tool_paragraph(&rest) {
+        // Take the line the paragraph was on with it.
+        let start = rest[..start].trim_end_matches([' ', '\t']).len();
+        let start = if rest[..start].ends_with('\n') { start - 1 } else { start };
+        rest.replace_range(start..end, "");
+    }
+    let Some(text) = text.map(str::trim).filter(|t| !t.is_empty()) else {
+        // Nothing left but an empty body: no notes.
+        let empty = notes_to_text(&rest).trim().is_empty() && !is_rich(&rest);
+        return (!empty).then_some(rest);
+    };
+    let para = format!("  <p xmlns=\"{XHTML}\" class=\"{TOOL_CLASS}\">{}</p>", escape(text));
+    if notes_to_text(&rest).trim().is_empty() && !is_rich(&rest) {
+        return Some(format!("
+<body xmlns=\"{XHTML}\">
+{para}
+</body>
+"));
+    }
+    match rest.rfind("</body>") {
+        Some(at) => {
+            let at = rest[..at].trim_end().len();
+            rest.insert_str(at, &format!("
+{para}"));
+        }
+        None => {
+            let at = rest.trim_end().len();
+            rest.insert_str(at, &format!("
+{para}"));
+        }
+    }
+    Some(rest)
+}
+
 /// Plain text as XHTML notes, or `None` for empty text.
 fn text_to_notes(text: &str) -> Option<String> {
     let text = text.replace("\r\n", "\n");
@@ -214,5 +287,33 @@ mod tests {
         assert_eq!(notes_to_text(xml), "About\n\nSee x.\n\n- one\n- two");
         assert!(!is_rich(r#"<html:p xmlns:html="http://www.w3.org/1999/xhtml">plain</html:p>"#));
         assert_eq!(notes_to_text("<p>caf&#233; &#x2013; ok</p>"), "caf\u{e9} \u{2013} ok");
+    }
+
+    #[test]
+    fn the_tool_note_keeps_other_notes_and_replaces_itself() {
+        use super::with_tool_note;
+        // No notes: a body with the paragraph.
+        let a = with_tool_note(None, Some("Identified as ADP & more")).unwrap();
+        assert!(a.contains("class=\"pathwayannotator\">Identified as ADP &amp; more</p>"), "{a}");
+        assert_eq!(notes_to_text(&a).trim(), "Identified as ADP & more");
+        // Replacing it leaves one paragraph.
+        let b = with_tool_note(Some(&a), Some("Identified as ATP")).unwrap();
+        assert_eq!(b.matches("pathwayannotator").count(), 1);
+        assert_eq!(notes_to_text(&b).trim(), "Identified as ATP");
+        // Removing it removes the notes it created.
+        assert_eq!(with_tool_note(Some(&b), None), None);
+        // The modeller's own notes are kept, before and after.
+        let own = "<body xmlns=\"http://www.w3.org/1999/xhtml\"><p>Mine</p></body>";
+        let c = with_tool_note(Some(own), Some("Identified as ADP")).unwrap();
+        assert_eq!(notes_to_text(&c).trim(), "Mine
+
+Identified as ADP");
+        assert_eq!(notes_to_text(&with_tool_note(Some(&c), None).unwrap()).trim(), "Mine");
+        // Notes without a body: the paragraph is added after them.
+        let bare = "<p xmlns=\"http://www.w3.org/1999/xhtml\">Mine</p>";
+        let d = with_tool_note(Some(bare), Some("Why")).unwrap();
+        assert_eq!(notes_to_text(&d).trim(), "Mine
+
+Why");
     }
 }

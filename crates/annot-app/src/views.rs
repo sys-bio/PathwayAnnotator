@@ -200,6 +200,7 @@ pub fn App() -> impl IntoView {
                 ctx.organism.set(ws.model_taxon());
                 let mut session = Session::new(p, ws, name);
                 session.remember_online(browser::remembered_names());
+                session.today = browser::now().get(..10).unwrap_or_default().to_string();
                 ctx.session.set(Some(session));
                 ctx.cursor.set(None);
                 ctx.selected.set(None);
@@ -2131,6 +2132,17 @@ fn Details(el: Element) -> impl IntoView {
     view! {
         <div class="details">
             <RenameId el=el/>
+            {move || {
+                s.with(|s| s.as_ref().and_then(|s| s.ws.tool_note(el)))
+                    .map(|note| {
+                        view! {
+                            <p class="tool-note">
+                                <span class="muted">"Saved in the model's notes: "</span>
+                                {note}
+                            </p>
+                        }
+                    })
+            }}
             <AnnotationEditor el=el/>
             <Show when=move || !matches!(el, Element::Compartment(_))>
             <h4>"Suggestions"</h4>
