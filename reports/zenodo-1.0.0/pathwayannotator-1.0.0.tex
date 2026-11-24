@@ -20,7 +20,7 @@
   \small $^{2}$eScience Institute, University of Washington, Seattle, WA, 98195-5061, USA
 }
 \date{\small Version 1.0.0, November 2026\\
-  DOI: \href{https://doi.org/10.5281/zenodo.24237183}{10.5281/zenodo.24237183}}
+  DOI: \href{https://doi.org/10.5281/zenodo.24517816}{10.5281/zenodo.24517816}}
 
 \begin{document}
 \maketitle
@@ -105,7 +105,10 @@ it, X is suggested as ADP. This refinement left the evaluation results below unc
 
 \textbf{Review and editing.} For each element the interface shows the suggestion, its confidence level,
 synonyms, links to the database entries, and the evidence. Accepting writes a \texttt{bqbiol:is} term with
-identifiers.org URIs and, where none is present, an SBO term. Users can change qualifiers, add or remove
+identifiers.org URIs and, where none is present, an SBO term. In versions after 1.0.0, accepting also records
+in the element's SBML notes what it was identified as, the confidence level and the evidence, with the tool
+version and date, so that the reason for an annotation travels with the model; any notes already present are
+kept. Users can change qualifiers, add or remove
 terms, set SBO terms, and rename SBML identifiers, with all references (including kinetic laws, rules and
 events) updated. Model-level annotation covers the modelling framework (SBO), references
 (\texttt{bqmodel:isDescribedBy}), organism, creators, dates and notes. Every change can be undone.
@@ -183,7 +186,7 @@ The application is available at \url{https://sys-bio.github.io/PathwayAnnotator/
 \url{https://github.com/sys-bio/PathwayAnnotator} under the MIT or Apache-2.0 licence. The repository
 includes the benchmark program and its full results, and the data snapshot from which the published
 knowledge base is built. Data sources: BiGG Models (CC BY 4.0 and the BiGG Models licence), ChEBI (CC BY 4.0),
-BioModels (CC0). This report is archived on Zenodo, \href{https://doi.org/10.5281/zenodo.24237183}{doi:10.5281/zenodo.24237183}.
+BioModels (CC0). This report is archived on Zenodo, \href{https://doi.org/10.5281/zenodo.24517816}{doi:10.5281/zenodo.24517816}.
 
 \section*{Use of AI}
 
